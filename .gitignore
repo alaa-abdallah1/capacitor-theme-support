@@ -1,0 +1,14 @@
+# Dependency directories
+node_modules/
+dist/
+.DS_Store
+.idea/
+.vscode/
+*.log
+*.tsbuildinfo
+
+.eslintcache
+
+# dotenv environment variables file
+.env
+
