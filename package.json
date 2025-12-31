@@ -1,6 +1,6 @@
 {
   "name": "capacitor-theme",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "A lightweight Capacitor plugin for advanced native theme customization, including Edge-to-Edge support, Window Background, and granular System Bar control for Android and iOS.",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
