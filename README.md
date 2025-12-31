@@ -8,6 +8,7 @@
 A lightweight Capacitor plugin for **advanced native theme customization** on Android and iOS.
 
 This plugin solves common theming issues in hybrid apps, such as:
+
 - 📱 **Edge-to-Edge Support**: Easily enable full-screen content behind system bars.
 - 🎨 **Window Background**: Fixes black bars appearing during rotation or overscroll by setting the native window background.
 - 🌈 **System Bar Colors**: Granular control over Status Bar and Navigation Bar colors.
@@ -41,10 +42,10 @@ await NativeTheme.enableEdgeToEdge();
 // 2. Set App Theme (can be called reactively when dark mode changes)
 await NativeTheme.setAppTheme({
   windowBackgroundColor: '#FFFFFF', // Fixes rotation black bars
-  statusBarColor: '#FFFFFF',        // Sets status bar color
-  navigationBarColor: '#FFFFFF',    // Sets nav bar color (Android only)
-  isStatusBarLight: true,           // true = Dark Icons (Light Background)
-  isNavigationBarLight: true        // true = Dark Icons (Light Background)
+  statusBarColor: '#FFFFFF', // Sets status bar color
+  navigationBarColor: '#FFFFFF', // Sets nav bar color (Android only)
+  isStatusBarLight: true, // true = Dark Icons (Light Background)
+  isNavigationBarLight: true, // true = Dark Icons (Light Background)
 });
 ```
 
@@ -54,24 +55,28 @@ await NativeTheme.setAppTheme({
 import { NativeTheme } from '@payiano/capacitor-theme';
 
 // Watch for theme changes
-watch(isDarkMode, (dark) => {
-  NativeTheme.setAppTheme({
-    windowBackgroundColor: dark ? '#000000' : '#FFFFFF',
-    statusBarColor: dark ? '#000000' : '#FFFFFF',
-    navigationBarColor: dark ? '#000000' : '#FFFFFF',
-    isStatusBarLight: !dark,
-    isNavigationBarLight: !dark
-  });
-}, { immediate: true });
+watch(
+  isDarkMode,
+  dark => {
+    NativeTheme.setAppTheme({
+      windowBackgroundColor: dark ? '#000000' : '#FFFFFF',
+      statusBarColor: dark ? '#000000' : '#FFFFFF',
+      navigationBarColor: dark ? '#000000' : '#FFFFFF',
+      isStatusBarLight: !dark,
+      isNavigationBarLight: !dark,
+    });
+  },
+  { immediate: true },
+);
 ```
 
 ## API
 
 <docgen-index>
 
-* [`enableEdgeToEdge()`](#enableedgetoedge)
-* [`setAppTheme(...)`](#setapptheme)
-* [Interfaces](#interfaces)
+- [`enableEdgeToEdge()`](#enableedgetoedge)
+- [`setAppTheme(...)`](#setapptheme)
+- [Interfaces](#interfaces)
 
 </docgen-index>
 
@@ -85,11 +90,11 @@ enableEdgeToEdge() => Promise<void>
 ```
 
 Enables Edge-to-Edge mode for the application.
+
 - **Android**: Sets `DecorFitsSystemWindows(false)` and applies safe area insets to the WebView.
 - **iOS**: Sets `contentInsetAdjustmentBehavior = .never` and makes the WebView transparent.
 
---------------------
-
+---
 
 ### setAppTheme(...)
 
@@ -99,25 +104,23 @@ setAppTheme(options: NativeThemeOptions) => Promise<void>
 
 Sets the application theme, including window background, system bar colors, and icon styles.
 
-| Param | Type | Description |
-| :--- | :--- | :--- |
+| Param         | Type                                                              | Description                 |
+| :------------ | :---------------------------------------------------------------- | :-------------------------- |
 | **`options`** | <code><a href="#nativethemeoptions">NativeThemeOptions</a></code> | Theme configuration options |
 
---------------------
-
+---
 
 ### Interfaces
 
-
 #### NativeThemeOptions
 
-| Prop | Type | Description |
-| :--- | :--- | :--- |
-| **`windowBackgroundColor`** | <code>string</code> | The background color of the window (visible in overscroll/notch areas). Hex color string (e.g. #FFFFFF). |
-| **`statusBarColor`** | <code>string</code> | The background color of the status bar. Hex color string (e.g. #FFFFFF) or #00000000 for transparent. |
-| **`navigationBarColor`** | <code>string</code> | The background color of the navigation bar. Hex color string (e.g. #FFFFFF) or #00000000 for transparent. |
-| **`isStatusBarLight`** | <code>boolean</code> | Whether the status bar should be light (Dark Icons). true = Dark Icons (Light Background), false = Light Icons (Dark Background). |
-| **`isNavigationBarLight`** | <code>boolean</code> | Whether the navigation bar should be light (Dark Icons). true = Dark Icons (Light Background), false = Light Icons (Dark Background). |
+| Prop                        | Type                 | Description                                                                                                                           |
+| :-------------------------- | :------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
+| **`windowBackgroundColor`** | <code>string</code>  | The background color of the window (visible in overscroll/notch areas). Hex color string (e.g. #FFFFFF).                              |
+| **`statusBarColor`**        | <code>string</code>  | The background color of the status bar. Hex color string (e.g. #FFFFFF) or #00000000 for transparent.                                 |
+| **`navigationBarColor`**    | <code>string</code>  | The background color of the navigation bar. Hex color string (e.g. #FFFFFF) or #00000000 for transparent.                             |
+| **`isStatusBarLight`**      | <code>boolean</code> | Whether the status bar should be light (Dark Icons). true = Dark Icons (Light Background), false = Light Icons (Dark Background).     |
+| **`isNavigationBarLight`**  | <code>boolean</code> | Whether the navigation bar should be light (Dark Icons). true = Dark Icons (Light Background), false = Light Icons (Dark Background). |
 
 </docgen-api>
 
