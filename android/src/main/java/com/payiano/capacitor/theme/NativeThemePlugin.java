@@ -809,30 +809,32 @@ public class NativeThemePlugin extends Plugin {
             return;
         }
 
-        contentView.setOutlineProvider(new ViewOutlineProvider() {
-            @Override
-            public void getOutline(View view, Outline outline) {
-                int width = view.getWidth();
-                int height = view.getHeight();
+        contentView.setOutlineProvider(
+            new ViewOutlineProvider() {
+                @Override
+                public void getOutline(View view, Outline outline) {
+                    int width = view.getWidth();
+                    int height = view.getHeight();
 
-                // Calculate corner radii based on cutout positions
-                float topLeft = hasLeftCutout ? radiusPx : 0;
-                float topRight = hasRightCutout ? radiusPx : 0;
-                float bottomLeft = hasLeftCutout ? radiusPx : 0;
-                float bottomRight = hasRightCutout ? radiusPx : 0;
+                    // Calculate corner radii based on cutout positions
+                    float topLeft = hasLeftCutout ? radiusPx : 0;
+                    float topRight = hasRightCutout ? radiusPx : 0;
+                    float bottomLeft = hasLeftCutout ? radiusPx : 0;
+                    float bottomRight = hasRightCutout ? radiusPx : 0;
 
-                // Use uniform radius if both sides have cutouts
-                if (hasLeftCutout && hasRightCutout) {
-                    outline.setRoundRect(0, 0, width, height, radiusPx);
-                } else if (hasLeftCutout) {
-                    // Only left side needs rounding - use path for asymmetric corners
-                    outline.setRoundRect(0, 0, width + (int)radiusPx, height, radiusPx);
-                } else if (hasRightCutout) {
-                    // Only right side needs rounding
-                    outline.setRoundRect(-(int)radiusPx, 0, width, height, radiusPx);
+                    // Use uniform radius if both sides have cutouts
+                    if (hasLeftCutout && hasRightCutout) {
+                        outline.setRoundRect(0, 0, width, height, radiusPx);
+                    } else if (hasLeftCutout) {
+                        // Only left side needs rounding - use path for asymmetric corners
+                        outline.setRoundRect(0, 0, width + (int) radiusPx, height, radiusPx);
+                    } else if (hasRightCutout) {
+                        // Only right side needs rounding
+                        outline.setRoundRect(-(int) radiusPx, 0, width, height, radiusPx);
+                    }
                 }
             }
-        });
+        );
         contentView.setClipToOutline(true);
     }
 
