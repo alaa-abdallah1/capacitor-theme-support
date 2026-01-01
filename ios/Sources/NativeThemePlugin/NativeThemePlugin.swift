@@ -86,6 +86,14 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             name: UIApplication.didBecomeActiveNotification,
             object: nil
         )
+        
+        // Listen for orientation changes to update overlays
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleOrientationChange),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
     }
     
     deinit {
@@ -97,6 +105,15 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         if newColorScheme != currentColorScheme {
             currentColorScheme = newColorScheme
             notifyColorSchemeChanged(newColorScheme)
+        }
+    }
+    
+    @objc private func handleOrientationChange() {
+        // Rebuild overlays when orientation changes to update sizes
+        if isEdgeToEdgeEnabled {
+            DispatchQueue.main.async { [weak self] in
+                self?.setupOverlayViews()
+            }
         }
     }
     
@@ -531,10 +548,30 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     }
     
     private func updateOverlayColors() {
+        let effectiveCutoutColor = cutoutBackgroundColor ?? contentBackgroundColor ?? .clear
+        
+        // Get current safe area insets to check for cutouts
+        let window = getKeyWindow()
+        let safeAreaInsets = window?.safeAreaInsets ?? UIEdgeInsets.zero
+        let hasLeftCutout = safeAreaInsets.left > 0
+        let hasRightCutout = safeAreaInsets.right > 0
+        
         statusBarOverlay?.backgroundColor = statusBarBackgroundColor ?? .clear
         bottomOverlay?.backgroundColor = navigationBarBackgroundColor ?? .clear
-        leftOverlay?.backgroundColor = navigationBarLeftBackgroundColor ?? .clear
-        rightOverlay?.backgroundColor = navigationBarRightBackgroundColor ?? .clear
+        
+        // Left bar: use cutout color if there's a cutout, otherwise use the left-specific color
+        if hasLeftCutout {
+            leftOverlay?.backgroundColor = effectiveCutoutColor
+        } else {
+            leftOverlay?.backgroundColor = navigationBarLeftBackgroundColor ?? navigationBarBackgroundColor ?? .clear
+        }
+        
+        // Right bar: use cutout color if there's a cutout, otherwise use the right-specific color
+        if hasRightCutout {
+            rightOverlay?.backgroundColor = effectiveCutoutColor
+        } else {
+            rightOverlay?.backgroundColor = navigationBarRightBackgroundColor ?? navigationBarBackgroundColor ?? .clear
+        }
     }
     
     // ============================================
