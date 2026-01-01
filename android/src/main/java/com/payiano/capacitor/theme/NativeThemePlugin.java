@@ -3,6 +3,7 @@ package com.payiano.capacitor.theme;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Outline;
+import android.graphics.Path;
 import android.os.Build;
 import android.view.Gravity;
 import android.view.RoundedCorner;
@@ -386,6 +387,8 @@ public class NativeThemePlugin extends Plugin {
      * - isStatusBarVisible: Current status bar visibility
      * - isNavigationBarVisible: Current navigation bar visibility
      * - colorScheme: Current system color scheme ('light' or 'dark')
+     * - contentCornerRadius: Current content corner radius in dp (-1 = use device default)
+     * - deviceCornerRadius: Detected device display corner radius in dp
      *
      * @param call Plugin call
      */
@@ -412,6 +415,14 @@ public class NativeThemePlugin extends Plugin {
 
         // Color scheme
         result.put("colorScheme", currentColorScheme);
+
+        // Corner radius values (convert pixels to dp)
+        float density = getActivity().getResources().getDisplayMetrics().density;
+        float contentRadiusDp = contentCornerRadius >= 0 ? contentCornerRadius : -1;
+        float deviceRadiusDp = deviceCornerRadiusPx > 0 ? deviceCornerRadiusPx / density : 0;
+
+        result.put("contentCornerRadius", contentRadiusDp);
+        result.put("deviceCornerRadius", deviceRadiusDp);
 
         call.resolve(result);
     }
@@ -490,72 +501,66 @@ public class NativeThemePlugin extends Plugin {
         String navigationBarRightBg,
         String cutoutBg
     ) {
-        // Parse content background first (base fallback for everything)
-        if (isValidColor(contentBg)) {
-            contentBackgroundColor = Color.parseColor(contentBg);
-        }
-
-        // Parse navigation bar colors BEFORE applying cascade
+        // Parse all colors first
+        Integer parsedContentBg = isValidColor(contentBg) ? Color.parseColor(contentBg) : null;
+        Integer parsedStatusBarBg = isValidColor(statusBarBg) ? Color.parseColor(statusBarBg) : null;
         Integer parsedNavBarBg = isValidColor(navigationBarBg) ? Color.parseColor(navigationBarBg) : null;
         Integer parsedNavBarLeftBg = isValidColor(navigationBarLeftBg) ? Color.parseColor(navigationBarLeftBg) : null;
         Integer parsedNavBarRightBg = isValidColor(navigationBarRightBg) ? Color.parseColor(navigationBarRightBg) : null;
+        Integer parsedCutoutBg = isValidColor(cutoutBg) ? Color.parseColor(cutoutBg) : null;
 
-        // Status bar: cascade from content
-        if (isValidColor(statusBarBg)) {
-            statusBarBackgroundColor = Color.parseColor(statusBarBg);
-        } else if (statusBarBackgroundColor == null && contentBackgroundColor != null) {
-            statusBarBackgroundColor = contentBackgroundColor;
+        // Update content background if provided
+        if (parsedContentBg != null) {
+            contentBackgroundColor = parsedContentBg;
         }
 
-        // Navigation bar (bottom): cascade from left/right if provided, then content
+        // Status bar: use provided value, or cascade from content
+        if (parsedStatusBarBg != null) {
+            statusBarBackgroundColor = parsedStatusBarBg;
+        } else if (parsedContentBg != null) {
+            statusBarBackgroundColor = parsedContentBg;
+        }
+
+        // Navigation bar (bottom): use provided, or cascade from left/right -> content
         if (parsedNavBarBg != null) {
             navigationBarBackgroundColor = parsedNavBarBg;
-        } else if (navigationBarBackgroundColor == null) {
-            // Try to use left or right as fallback
-            if (parsedNavBarLeftBg != null) {
-                navigationBarBackgroundColor = parsedNavBarLeftBg;
-            } else if (parsedNavBarRightBg != null) {
-                navigationBarBackgroundColor = parsedNavBarRightBg;
-            } else if (contentBackgroundColor != null) {
-                navigationBarBackgroundColor = contentBackgroundColor;
-            }
+        } else if (parsedNavBarLeftBg != null) {
+            navigationBarBackgroundColor = parsedNavBarLeftBg;
+        } else if (parsedNavBarRightBg != null) {
+            navigationBarBackgroundColor = parsedNavBarRightBg;
+        } else if (parsedContentBg != null) {
+            navigationBarBackgroundColor = parsedContentBg;
         }
 
-        // Navigation bar left (landscape): cascade from right -> navBar -> content
+        // Navigation bar left: use provided, or cascade from right -> navBar -> content
         if (parsedNavBarLeftBg != null) {
             navigationBarLeftBackgroundColor = parsedNavBarLeftBg;
-        } else if (navigationBarLeftBackgroundColor == null) {
-            if (parsedNavBarRightBg != null) {
-                navigationBarLeftBackgroundColor = parsedNavBarRightBg;
-            } else if (navigationBarBackgroundColor != null) {
-                navigationBarLeftBackgroundColor = navigationBarBackgroundColor;
-            } else if (contentBackgroundColor != null) {
-                navigationBarLeftBackgroundColor = contentBackgroundColor;
-            }
+        } else if (parsedNavBarRightBg != null) {
+            navigationBarLeftBackgroundColor = parsedNavBarRightBg;
+        } else if (parsedNavBarBg != null) {
+            navigationBarLeftBackgroundColor = parsedNavBarBg;
+        } else if (parsedContentBg != null) {
+            navigationBarLeftBackgroundColor = parsedContentBg;
         }
 
-        // Navigation bar right (landscape): cascade from left -> navBar -> content
+        // Navigation bar right: use provided, or cascade from left -> navBar -> content
         if (parsedNavBarRightBg != null) {
             navigationBarRightBackgroundColor = parsedNavBarRightBg;
-        } else if (navigationBarRightBackgroundColor == null) {
-            if (parsedNavBarLeftBg != null) {
-                navigationBarRightBackgroundColor = parsedNavBarLeftBg;
-            } else if (navigationBarBackgroundColor != null) {
-                navigationBarRightBackgroundColor = navigationBarBackgroundColor;
-            } else if (contentBackgroundColor != null) {
-                navigationBarRightBackgroundColor = contentBackgroundColor;
-            }
+        } else if (parsedNavBarLeftBg != null) {
+            navigationBarRightBackgroundColor = parsedNavBarLeftBg;
+        } else if (parsedNavBarBg != null) {
+            navigationBarRightBackgroundColor = parsedNavBarBg;
+        } else if (parsedContentBg != null) {
+            navigationBarRightBackgroundColor = parsedContentBg;
         }
 
-        // Cutout: cascade from status bar -> content
-        if (isValidColor(cutoutBg)) {
-            cutoutBackgroundColor = Color.parseColor(cutoutBg);
-        } else if (cutoutBackgroundColor == null) {
-            if (statusBarBackgroundColor != null) {
-                cutoutBackgroundColor = statusBarBackgroundColor;
-            } else if (contentBackgroundColor != null) {
-                cutoutBackgroundColor = contentBackgroundColor;
-            }
+        // Cutout: use provided, or cascade from status bar -> content
+        if (parsedCutoutBg != null) {
+            cutoutBackgroundColor = parsedCutoutBg;
+        } else if (parsedStatusBarBg != null) {
+            cutoutBackgroundColor = parsedStatusBarBg;
+        } else if (parsedContentBg != null) {
+            cutoutBackgroundColor = parsedContentBg;
         }
     }
 
@@ -756,6 +761,9 @@ public class NativeThemePlugin extends Plugin {
                 cutoutLeft = cutoutInsets.left;
                 cutoutRight = cutoutInsets.right;
 
+                // Detect device corner radius from actual WindowInsets (Android 12+)
+                detectDeviceCornerRadiusFromInsets(insets.toWindowInsets());
+
                 // Update content padding and overlays
                 updateContentPadding(window);
                 updateOverlaySizes(window);
@@ -830,6 +838,13 @@ public class NativeThemePlugin extends Plugin {
 
         final float radiusPx = effectiveRadiusPx;
 
+        // Determine corner radii: [topLeft, topRight, bottomRight, bottomLeft]
+        // Only round corners on the cutout side
+        final float topLeftRadius = hasLeftCutout ? radiusPx : 0;
+        final float topRightRadius = hasRightCutout ? radiusPx : 0;
+        final float bottomRightRadius = hasRightCutout ? radiusPx : 0;
+        final float bottomLeftRadius = hasLeftCutout ? radiusPx : 0;
+
         contentView.setOutlineProvider(
             new ViewOutlineProvider() {
                 @Override
@@ -837,20 +852,79 @@ public class NativeThemePlugin extends Plugin {
                     int width = view.getWidth();
                     int height = view.getHeight();
 
-                    // Use uniform radius if both sides have cutouts
-                    if (hasLeftCutout && hasRightCutout) {
-                        outline.setRoundRect(0, 0, width, height, radiusPx);
-                    } else if (hasLeftCutout) {
-                        // Only left side needs rounding - use path for asymmetric corners
-                        outline.setRoundRect(0, 0, width + (int) radiusPx, height, radiusPx);
-                    } else if (hasRightCutout) {
-                        // Only right side needs rounding
-                        outline.setRoundRect(-(int) radiusPx, 0, width, height, radiusPx);
+                    if (width <= 0 || height <= 0) {
+                        outline.setRect(0, 0, width, height);
+                        return;
+                    }
+
+                    // Create a path with asymmetric corners
+                    Path path = new Path();
+
+                    // radii array: [topLeftX, topLeftY, topRightX, topRightY,
+                    //               bottomRightX, bottomRightY, bottomLeftX, bottomLeftY]
+                    float[] radii = new float[] {
+                        topLeftRadius,
+                        topLeftRadius,
+                        topRightRadius,
+                        topRightRadius,
+                        bottomRightRadius,
+                        bottomRightRadius,
+                        bottomLeftRadius,
+                        bottomLeftRadius
+                    };
+
+                    path.addRoundRect(0, 0, width, height, radii, Path.Direction.CW);
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        outline.setPath(path);
+                    } else {
+                        // For older API levels, check if path is convex
+                        if (path.isConvex()) {
+                            outline.setConvexPath(path);
+                        } else {
+                            // Fallback to uniform radius if path is not convex
+                            outline.setRoundRect(0, 0, width, height, radiusPx);
+                        }
                     }
                 }
             }
         );
         contentView.setClipToOutline(true);
+    }
+
+    /**
+     * Detect the device's display corner radius from WindowInsets.
+     * Available on Android 12 (API 31) and above.
+     */
+    private void detectDeviceCornerRadiusFromInsets(android.view.WindowInsets windowInsets) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && windowInsets != null) {
+            try {
+                // Try to get corner radius from different positions
+                RoundedCorner topLeft = windowInsets.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT);
+                RoundedCorner topRight = windowInsets.getRoundedCorner(RoundedCorner.POSITION_TOP_RIGHT);
+                RoundedCorner bottomLeft = windowInsets.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_LEFT);
+                RoundedCorner bottomRight = windowInsets.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_RIGHT);
+
+                // Use the maximum corner radius found
+                float maxRadius = 0;
+                if (topLeft != null) maxRadius = Math.max(maxRadius, topLeft.getRadius());
+                if (topRight != null) maxRadius = Math.max(maxRadius, topRight.getRadius());
+                if (bottomLeft != null) maxRadius = Math.max(maxRadius, bottomLeft.getRadius());
+                if (bottomRight != null) maxRadius = Math.max(maxRadius, bottomRight.getRadius());
+
+                if (maxRadius > 0) {
+                    deviceCornerRadiusPx = maxRadius;
+                } else {
+                    // Fallback to default if no corners reported
+                    setDefaultDeviceCornerRadius();
+                }
+            } catch (Exception e) {
+                setDefaultDeviceCornerRadius();
+            }
+        } else if (deviceCornerRadiusPx <= 0) {
+            // For older Android versions, use a reasonable default
+            setDefaultDeviceCornerRadius();
+        }
     }
 
     /**
@@ -866,31 +940,25 @@ public class NativeThemePlugin extends Plugin {
                 // Get the window insets
                 android.view.WindowInsets windowInsets = decorView.getRootWindowInsets();
                 if (windowInsets != null) {
-                    // Try to get corner radius from different positions
-                    RoundedCorner topLeft = windowInsets.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT);
-                    RoundedCorner topRight = windowInsets.getRoundedCorner(RoundedCorner.POSITION_TOP_RIGHT);
-                    RoundedCorner bottomLeft = windowInsets.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_LEFT);
-                    RoundedCorner bottomRight = windowInsets.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_RIGHT);
-
-                    // Use the maximum corner radius found
-                    float maxRadius = 0;
-                    if (topLeft != null) maxRadius = Math.max(maxRadius, topLeft.getRadius());
-                    if (topRight != null) maxRadius = Math.max(maxRadius, topRight.getRadius());
-                    if (bottomLeft != null) maxRadius = Math.max(maxRadius, bottomLeft.getRadius());
-                    if (bottomRight != null) maxRadius = Math.max(maxRadius, bottomRight.getRadius());
-
-                    deviceCornerRadiusPx = maxRadius;
+                    detectDeviceCornerRadiusFromInsets(windowInsets);
+                } else {
+                    // Insets not ready yet, use default - will be updated in insets listener
+                    setDefaultDeviceCornerRadius();
                 }
             } catch (Exception e) {
-                // Fallback to a reasonable default (24dp) if detection fails
-                float density = getContext().getResources().getDisplayMetrics().density;
-                deviceCornerRadiusPx = 24 * density;
+                setDefaultDeviceCornerRadius();
             }
         } else {
-            // For older Android versions, use a reasonable default (24dp)
-            float density = getContext().getResources().getDisplayMetrics().density;
-            deviceCornerRadiusPx = 24 * density;
+            setDefaultDeviceCornerRadius();
         }
+    }
+
+    /**
+     * Set default device corner radius (24dp).
+     */
+    private void setDefaultDeviceCornerRadius() {
+        float density = getContext().getResources().getDisplayMetrics().density;
+        deviceCornerRadiusPx = 24 * density;
     }
 
     // ============================================

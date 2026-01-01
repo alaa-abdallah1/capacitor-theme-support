@@ -58,6 +58,16 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     private var navigationBarBackgroundColor: UIColor? // Home indicator area on iOS
     private var navigationBarLeftBackgroundColor: UIColor? // Left inset in landscape
     private var navigationBarRightBackgroundColor: UIColor? // Right inset in landscape
+    
+    // ============================================
+    // Corner Radius Configuration
+    // ============================================
+    
+    /// Content corner radius in points. -1 means use device default, 0 means disabled.
+    private var contentCornerRadius: CGFloat = -1
+    
+    /// Device display corner radius in points. Detected from device screen.
+    private var deviceCornerRadius: CGFloat = 0
     private var cutoutBackgroundColor: UIColor? // Dynamic Island/Notch area
     
     // ============================================
@@ -78,6 +88,9 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         
         // Initialize color scheme
         currentColorScheme = getSystemColorScheme()
+        
+        // Detect device corner radius
+        detectDeviceCornerRadius()
         
         // Listen for trait changes (including dark mode)
         NotificationCenter.default.addObserver(
@@ -118,6 +131,7 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         let navigationBarLeftBg = call.getString("navigationBarLeftBackgroundColor")
         let navigationBarRightBg = call.getString("navigationBarRightBackgroundColor")
         let cutoutBg = call.getString("cutoutBackgroundColor")
+        let cornerRadius = call.getFloat("contentCornerRadius")
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else {
@@ -128,6 +142,11 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             // Handle edge-to-edge mode
             if let enabled = edgeToEdge {
                 self.configureEdgeToEdge(enabled: enabled)
+            }
+            
+            // Handle content corner radius
+            if let radius = cornerRadius {
+                self.contentCornerRadius = CGFloat(radius)
             }
             
             // Parse and store colors
@@ -142,6 +161,9 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             
             // Apply background colors
             self.applyBackgroundColors()
+            
+            // Apply content corner radius
+            self.applyContentCornerRadius()
             
             // Handle visibility
             if let visible = statusBarVisible {
@@ -285,6 +307,10 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             // Color scheme
             result["colorScheme"] = self.currentColorScheme
             
+            // Corner radius values
+            result["contentCornerRadius"] = self.contentCornerRadius
+            result["deviceCornerRadius"] = self.deviceCornerRadius
+            
             call.resolve(result)
         }
     }
@@ -346,72 +372,66 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         navigationBarRightBg: String?,
         cutoutBg: String?
     ) {
-        // Parse content background first (base fallback for everything)
-        if let bg = contentBg, let color = UIColor.fromHex(bg) {
-            contentBackgroundColor = color
-        }
-        
-        // Parse navigation bar colors BEFORE applying cascade
+        // Parse all colors first
+        let parsedContentBg = contentBg.flatMap { UIColor.fromHex($0) }
+        let parsedStatusBarBg = statusBarBg.flatMap { UIColor.fromHex($0) }
         let parsedNavBarBg = navigationBarBg.flatMap { UIColor.fromHex($0) }
         let parsedNavBarLeftBg = navigationBarLeftBg.flatMap { UIColor.fromHex($0) }
         let parsedNavBarRightBg = navigationBarRightBg.flatMap { UIColor.fromHex($0) }
+        let parsedCutoutBg = cutoutBg.flatMap { UIColor.fromHex($0) }
         
-        // Status bar: cascade from content
-        if let bg = statusBarBg, let color = UIColor.fromHex(bg) {
+        // Update content background if provided
+        if let color = parsedContentBg {
+            contentBackgroundColor = color
+        }
+        
+        // Status bar: use provided value, or cascade from content
+        if let color = parsedStatusBarBg {
             statusBarBackgroundColor = color
-        } else if statusBarBackgroundColor == nil, let content = contentBackgroundColor {
+        } else if let content = parsedContentBg {
             statusBarBackgroundColor = content
         }
         
-        // Navigation bar (bottom): cascade from left/right if provided, then content
+        // Navigation bar (bottom): use provided, or cascade from left/right -> content
         if let color = parsedNavBarBg {
             navigationBarBackgroundColor = color
-        } else if navigationBarBackgroundColor == nil {
-            // Try to use left or right as fallback
-            if let left = parsedNavBarLeftBg {
-                navigationBarBackgroundColor = left
-            } else if let right = parsedNavBarRightBg {
-                navigationBarBackgroundColor = right
-            } else if let content = contentBackgroundColor {
-                navigationBarBackgroundColor = content
-            }
+        } else if let left = parsedNavBarLeftBg {
+            navigationBarBackgroundColor = left
+        } else if let right = parsedNavBarRightBg {
+            navigationBarBackgroundColor = right
+        } else if let content = parsedContentBg {
+            navigationBarBackgroundColor = content
         }
         
-        // Navigation bar left (landscape): cascade from right -> navBar -> content
+        // Navigation bar left: use provided, or cascade from right -> navBar -> content
         if let color = parsedNavBarLeftBg {
             navigationBarLeftBackgroundColor = color
-        } else if navigationBarLeftBackgroundColor == nil {
-            if let right = parsedNavBarRightBg {
-                navigationBarLeftBackgroundColor = right
-            } else if let navBar = navigationBarBackgroundColor {
-                navigationBarLeftBackgroundColor = navBar
-            } else if let content = contentBackgroundColor {
-                navigationBarLeftBackgroundColor = content
-            }
+        } else if let right = parsedNavBarRightBg {
+            navigationBarLeftBackgroundColor = right
+        } else if let navBar = parsedNavBarBg {
+            navigationBarLeftBackgroundColor = navBar
+        } else if let content = parsedContentBg {
+            navigationBarLeftBackgroundColor = content
         }
         
-        // Navigation bar right (landscape): cascade from left -> navBar -> content
+        // Navigation bar right: use provided, or cascade from left -> navBar -> content
         if let color = parsedNavBarRightBg {
             navigationBarRightBackgroundColor = color
-        } else if navigationBarRightBackgroundColor == nil {
-            if let left = parsedNavBarLeftBg {
-                navigationBarRightBackgroundColor = left
-            } else if let navBar = navigationBarBackgroundColor {
-                navigationBarRightBackgroundColor = navBar
-            } else if let content = contentBackgroundColor {
-                navigationBarRightBackgroundColor = content
-            }
+        } else if let left = parsedNavBarLeftBg {
+            navigationBarRightBackgroundColor = left
+        } else if let navBar = parsedNavBarBg {
+            navigationBarRightBackgroundColor = navBar
+        } else if let content = parsedContentBg {
+            navigationBarRightBackgroundColor = content
         }
         
-        // Cutout: cascade from status bar -> content
-        if let bg = cutoutBg, let color = UIColor.fromHex(bg) {
+        // Cutout: use provided, or cascade from status bar -> content
+        if let color = parsedCutoutBg {
             cutoutBackgroundColor = color
-        } else if cutoutBackgroundColor == nil {
-            if let statusBar = statusBarBackgroundColor {
-                cutoutBackgroundColor = statusBar
-            } else if let content = contentBackgroundColor {
-                cutoutBackgroundColor = content
-            }
+        } else if let statusBar = parsedStatusBarBg {
+            cutoutBackgroundColor = statusBar
+        } else if let content = parsedContentBg {
+            cutoutBackgroundColor = content
         }
     }
     
@@ -566,6 +586,106 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         var data = JSObject()
         data["colorScheme"] = colorScheme
         notifyListeners(EVENT_COLOR_SCHEME_CHANGED, data: data)
+    }
+    
+    // ============================================
+    // CORNER RADIUS HELPERS
+    // ============================================
+    
+    /**
+     * Detect the device's display corner radius.
+     * Uses private API on iOS to get actual screen corner radius.
+     */
+    private func detectDeviceCornerRadius() {
+        if #available(iOS 13.0, *) {
+            // Try to get corner radius from the display
+            // iOS doesn't have a public API for this, so we use a known default
+            // based on device type. Modern iPhones with notch/dynamic island have ~40pt corners.
+            let window = getKeyWindow()
+            let screen = window?.screen ?? UIScreen.main
+            
+            // Check if device has safe area (indicates modern iPhone with rounded corners)
+            let safeAreaInsets = window?.safeAreaInsets ?? UIEdgeInsets.zero
+            
+            if safeAreaInsets.top > 20 {
+                // Modern iPhone with notch/dynamic island - use 40pt
+                deviceCornerRadius = 40
+            } else if safeAreaInsets.bottom > 0 {
+                // iPhone X-style home indicator - use 40pt
+                deviceCornerRadius = 40
+            } else {
+                // Older device or iPad - no corner radius or minimal
+                deviceCornerRadius = 0
+            }
+        } else {
+            // Pre-iOS 13 devices don't have rounded corners
+            deviceCornerRadius = 0
+        }
+    }
+    
+    /**
+     * Apply corner radius to the content view.
+     * Only applies in landscape mode when there are cutouts on the sides.
+     */
+    private func applyContentCornerRadius() {
+        guard let webView = bridge?.webView else { return }
+        
+        // Determine effective radius
+        let effectiveRadius: CGFloat
+        if contentCornerRadius < 0 {
+            // Use device corner radius
+            effectiveRadius = deviceCornerRadius
+        } else if contentCornerRadius == 0 {
+            // Disabled
+            webView.layer.cornerRadius = 0
+            webView.layer.maskedCorners = []
+            webView.clipsToBounds = false
+            return
+        } else {
+            effectiveRadius = contentCornerRadius
+        }
+        
+        // Skip if no radius
+        if effectiveRadius <= 0 {
+            webView.layer.cornerRadius = 0
+            webView.layer.maskedCorners = []
+            webView.clipsToBounds = false
+            return
+        }
+        
+        // Check orientation and cutouts
+        let window = getKeyWindow()
+        let safeAreaInsets = window?.safeAreaInsets ?? UIEdgeInsets.zero
+        let isLandscape = UIDevice.current.orientation.isLandscape ||
+                          (window?.frame.width ?? 0) > (window?.frame.height ?? 0)
+        
+        let hasLeftCutout = safeAreaInsets.left > 0
+        let hasRightCutout = safeAreaInsets.right > 0
+        
+        if !isLandscape || (!hasLeftCutout && !hasRightCutout) {
+            // Portrait or no cutouts - remove corner radius
+            webView.layer.cornerRadius = 0
+            webView.layer.maskedCorners = []
+            webView.clipsToBounds = false
+            return
+        }
+        
+        // Apply corner radius only on cutout sides
+        var maskedCorners: CACornerMask = []
+        
+        if hasLeftCutout {
+            maskedCorners.insert(.layerMinXMinYCorner) // Top-left
+            maskedCorners.insert(.layerMinXMaxYCorner) // Bottom-left
+        }
+        
+        if hasRightCutout {
+            maskedCorners.insert(.layerMaxXMinYCorner) // Top-right
+            maskedCorners.insert(.layerMaxXMaxYCorner) // Bottom-right
+        }
+        
+        webView.layer.cornerRadius = effectiveRadius
+        webView.layer.maskedCorners = maskedCorners
+        webView.clipsToBounds = true
     }
 }
 

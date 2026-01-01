@@ -10,11 +10,9 @@ import type {
   EdgeToEdgeOptions,
   SystemUIInfo,
   ColorSchemeResult,
-  ColorSchemeChangeEvent
+  ColorSchemeChangeEvent,
 } from './definitions';
-import {
-  ColorScheme
-} from './definitions';
+import { ColorScheme } from './definitions';
 
 /**
  * Web implementation of the SystemUI plugin.
@@ -44,7 +42,9 @@ export class SystemUIWeb extends WebPlugin implements SystemUIPlugin {
       );
 
       const handler = (event: MediaQueryListEvent) => {
-        const colorScheme = event.matches ? ColorScheme.Dark : ColorScheme.Light;
+        const colorScheme = event.matches
+          ? ColorScheme.Dark
+          : ColorScheme.Light;
         this.notifyListeners('colorSchemeChanged', {
           colorScheme,
         } as ColorSchemeChangeEvent);
@@ -182,6 +182,8 @@ export class SystemUIWeb extends WebPlugin implements SystemUIPlugin {
       isStatusBarVisible: true,
       isNavigationBarVisible: true,
       colorScheme: this.getCurrentColorScheme(),
+      contentCornerRadius: -1,
+      deviceCornerRadius: 0,
     };
   }
 

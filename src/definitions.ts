@@ -447,6 +447,26 @@ export interface SystemUIInfo {
    * Current system color scheme.
    */
   colorScheme: ColorScheme;
+
+  // ---- Corner Radius (dp) ----
+
+  /**
+   * Current content corner radius in dp.
+   *
+   * Returns the configured content corner radius value.
+   * A value of -1 means the device default is being used.
+   * A value of 0 means corner radius is disabled.
+   */
+  contentCornerRadius: number;
+
+  /**
+   * Detected device display corner radius in dp.
+   *
+   * This is the corner radius detected from the device's display.
+   * On Android 12+, this is read from the actual display corners.
+   * On older devices, a default of 24dp is used.
+   */
+  deviceCornerRadius: number;
 }
 
 // ============================================
