@@ -2,10 +2,13 @@ package com.payiano.capacitor.theme;
 
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.graphics.Outline;
 import android.os.Build;
 import android.view.Gravity;
+import android.view.RoundedCorner;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
@@ -100,6 +103,12 @@ public class NativeThemePlugin extends Plugin {
     /** Background color for display cutout areas */
     private Integer cutoutBackgroundColor = null;
 
+    /** Corner radius for content area in landscape (dp). -1 means use device default */
+    private float contentCornerRadius = -1f;
+
+    /** Cached device corner radius (in pixels) */
+    private float deviceCornerRadiusPx = 0f;
+
     // ============================================
     // Overlay Views for System Bar Colors
     // ============================================
@@ -159,6 +168,7 @@ public class NativeThemePlugin extends Plugin {
      * - navigationBarLeftBackgroundColor: Left bar background in landscape (hex string)
      * - navigationBarRightBackgroundColor: Right bar background in landscape (hex string)
      * - cutoutBackgroundColor: Display cutout area background (hex string)
+     * - contentCornerRadius: Corner radius for content area in landscape (number, in dp)
      *
      * @param call Plugin call containing configuration options
      */
@@ -176,6 +186,7 @@ public class NativeThemePlugin extends Plugin {
         String navigationBarLeftBg = call.getString("navigationBarLeftBackgroundColor");
         String navigationBarRightBg = call.getString("navigationBarRightBackgroundColor");
         String cutoutBg = call.getString("cutoutBackgroundColor");
+        Double cornerRadius = call.getDouble("contentCornerRadius");
 
         runOnUI(
             () -> {
@@ -190,7 +201,12 @@ public class NativeThemePlugin extends Plugin {
                     // Parse and store colors
                     parseAndStoreColors(contentBg, statusBarBg, navigationBarBg, navigationBarLeftBg, navigationBarRightBg, cutoutBg);
 
-                    // Apply background colors
+                    // Handle corner radius
+                    if (cornerRadius != null) {
+                        contentCornerRadius = cornerRadius.floatValue();
+                    }
+
+                    // Apply background colors and corner radius
                     applyBackgroundColors(window);
 
                     // Handle visibility
@@ -469,50 +485,72 @@ public class NativeThemePlugin extends Plugin {
         String navigationBarRightBg,
         String cutoutBg
     ) {
-        // Parse content background
+        // Parse content background first (base fallback for everything)
         if (isValidColor(contentBg)) {
             contentBackgroundColor = Color.parseColor(contentBg);
         }
 
-        // Status bar: if not provided but content is, use content color
+        // Parse navigation bar colors BEFORE applying cascade
+        Integer parsedNavBarBg = isValidColor(navigationBarBg) ? Color.parseColor(navigationBarBg) : null;
+        Integer parsedNavBarLeftBg = isValidColor(navigationBarLeftBg) ? Color.parseColor(navigationBarLeftBg) : null;
+        Integer parsedNavBarRightBg = isValidColor(navigationBarRightBg) ? Color.parseColor(navigationBarRightBg) : null;
+
+        // Status bar: cascade from content
         if (isValidColor(statusBarBg)) {
             statusBarBackgroundColor = Color.parseColor(statusBarBg);
-        } else if (contentBackgroundColor != null && statusBarBackgroundColor == null) {
+        } else if (statusBarBackgroundColor == null && contentBackgroundColor != null) {
             statusBarBackgroundColor = contentBackgroundColor;
         }
 
-        // Navigation bar (bottom): if not provided but content is, use content color
-        if (isValidColor(navigationBarBg)) {
-            navigationBarBackgroundColor = Color.parseColor(navigationBarBg);
-        } else if (contentBackgroundColor != null && navigationBarBackgroundColor == null) {
-            navigationBarBackgroundColor = contentBackgroundColor;
+        // Navigation bar (bottom): cascade from left/right if provided, then content
+        if (parsedNavBarBg != null) {
+            navigationBarBackgroundColor = parsedNavBarBg;
+        } else if (navigationBarBackgroundColor == null) {
+            // Try to use left or right as fallback
+            if (parsedNavBarLeftBg != null) {
+                navigationBarBackgroundColor = parsedNavBarLeftBg;
+            } else if (parsedNavBarRightBg != null) {
+                navigationBarBackgroundColor = parsedNavBarRightBg;
+            } else if (contentBackgroundColor != null) {
+                navigationBarBackgroundColor = contentBackgroundColor;
+            }
         }
 
-        // Navigation bar left (landscape): cascade from navigationBarBackgroundColor
-        if (isValidColor(navigationBarLeftBg)) {
-            navigationBarLeftBackgroundColor = Color.parseColor(navigationBarLeftBg);
-        } else if (navigationBarBackgroundColor != null && navigationBarLeftBackgroundColor == null) {
-            navigationBarLeftBackgroundColor = navigationBarBackgroundColor;
-        } else if (contentBackgroundColor != null && navigationBarLeftBackgroundColor == null) {
-            navigationBarLeftBackgroundColor = contentBackgroundColor;
+        // Navigation bar left (landscape): cascade from right -> navBar -> content
+        if (parsedNavBarLeftBg != null) {
+            navigationBarLeftBackgroundColor = parsedNavBarLeftBg;
+        } else if (navigationBarLeftBackgroundColor == null) {
+            if (parsedNavBarRightBg != null) {
+                navigationBarLeftBackgroundColor = parsedNavBarRightBg;
+            } else if (navigationBarBackgroundColor != null) {
+                navigationBarLeftBackgroundColor = navigationBarBackgroundColor;
+            } else if (contentBackgroundColor != null) {
+                navigationBarLeftBackgroundColor = contentBackgroundColor;
+            }
         }
 
-        // Navigation bar right (landscape): cascade from navigationBarBackgroundColor
-        if (isValidColor(navigationBarRightBg)) {
-            navigationBarRightBackgroundColor = Color.parseColor(navigationBarRightBg);
-        } else if (navigationBarBackgroundColor != null && navigationBarRightBackgroundColor == null) {
-            navigationBarRightBackgroundColor = navigationBarBackgroundColor;
-        } else if (contentBackgroundColor != null && navigationBarRightBackgroundColor == null) {
-            navigationBarRightBackgroundColor = contentBackgroundColor;
+        // Navigation bar right (landscape): cascade from left -> navBar -> content
+        if (parsedNavBarRightBg != null) {
+            navigationBarRightBackgroundColor = parsedNavBarRightBg;
+        } else if (navigationBarRightBackgroundColor == null) {
+            if (parsedNavBarLeftBg != null) {
+                navigationBarRightBackgroundColor = parsedNavBarLeftBg;
+            } else if (navigationBarBackgroundColor != null) {
+                navigationBarRightBackgroundColor = navigationBarBackgroundColor;
+            } else if (contentBackgroundColor != null) {
+                navigationBarRightBackgroundColor = contentBackgroundColor;
+            }
         }
 
-        // Cutout: if not provided, use status bar, then content background
+        // Cutout: cascade from status bar -> content
         if (isValidColor(cutoutBg)) {
             cutoutBackgroundColor = Color.parseColor(cutoutBg);
-        } else if (statusBarBackgroundColor != null) {
-            cutoutBackgroundColor = statusBarBackgroundColor;
-        } else {
-            cutoutBackgroundColor = contentBackgroundColor;
+        } else if (cutoutBackgroundColor == null) {
+            if (statusBarBackgroundColor != null) {
+                cutoutBackgroundColor = statusBarBackgroundColor;
+            } else if (contentBackgroundColor != null) {
+                cutoutBackgroundColor = contentBackgroundColor;
+            }
         }
     }
 
@@ -738,6 +776,64 @@ public class NativeThemePlugin extends Plugin {
         } else {
             contentView.setPadding(0, 0, 0, 0);
         }
+
+        // Apply corner radius for cutout areas in landscape
+        applyContentCornerRadius(contentView);
+    }
+
+    /**
+     * Apply corner radius to content view for cutout areas.
+     * The radius is applied on sides with cutouts in landscape mode.
+     */
+    private void applyContentCornerRadius(View contentView) {
+        if (contentCornerRadius <= 0) {
+            // Remove any existing outline
+            contentView.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+            contentView.setClipToOutline(false);
+            return;
+        }
+
+        // Convert dp to pixels
+        float density = getContext().getResources().getDisplayMetrics().density;
+        final float radiusPx = contentCornerRadius * density;
+
+        // Check if we're in landscape and have cutouts
+        boolean isLandscape = getContext().getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+        final boolean hasLeftCutout = cutoutLeft > 0;
+        final boolean hasRightCutout = cutoutRight > 0;
+
+        if (!isLandscape || (!hasLeftCutout && !hasRightCutout)) {
+            // Portrait or no cutouts - remove corner radius
+            contentView.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+            contentView.setClipToOutline(false);
+            return;
+        }
+
+        contentView.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                int width = view.getWidth();
+                int height = view.getHeight();
+
+                // Calculate corner radii based on cutout positions
+                float topLeft = hasLeftCutout ? radiusPx : 0;
+                float topRight = hasRightCutout ? radiusPx : 0;
+                float bottomLeft = hasLeftCutout ? radiusPx : 0;
+                float bottomRight = hasRightCutout ? radiusPx : 0;
+
+                // Use uniform radius if both sides have cutouts
+                if (hasLeftCutout && hasRightCutout) {
+                    outline.setRoundRect(0, 0, width, height, radiusPx);
+                } else if (hasLeftCutout) {
+                    // Only left side needs rounding - use path for asymmetric corners
+                    outline.setRoundRect(0, 0, width + (int)radiusPx, height, radiusPx);
+                } else if (hasRightCutout) {
+                    // Only right side needs rounding
+                    outline.setRoundRect(-(int)radiusPx, 0, width, height, radiusPx);
+                }
+            }
+        });
+        contentView.setClipToOutline(true);
     }
 
     // ============================================

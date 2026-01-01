@@ -346,50 +346,72 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         navigationBarRightBg: String?,
         cutoutBg: String?
     ) {
-        // Parse content background
+        // Parse content background first (base fallback for everything)
         if let bg = contentBg, let color = UIColor.fromHex(bg) {
             contentBackgroundColor = color
         }
         
-        // Status bar: if not provided but content is, use content color
+        // Parse navigation bar colors BEFORE applying cascade
+        let parsedNavBarBg = navigationBarBg.flatMap { UIColor.fromHex($0) }
+        let parsedNavBarLeftBg = navigationBarLeftBg.flatMap { UIColor.fromHex($0) }
+        let parsedNavBarRightBg = navigationBarRightBg.flatMap { UIColor.fromHex($0) }
+        
+        // Status bar: cascade from content
         if let bg = statusBarBg, let color = UIColor.fromHex(bg) {
             statusBarBackgroundColor = color
-        } else if statusBarBackgroundColor == nil && contentBackgroundColor != nil {
-            statusBarBackgroundColor = contentBackgroundColor
+        } else if statusBarBackgroundColor == nil, let content = contentBackgroundColor {
+            statusBarBackgroundColor = content
         }
         
-        // Navigation bar (home indicator area): if not provided but content is, use content color
-        if let bg = navigationBarBg, let color = UIColor.fromHex(bg) {
+        // Navigation bar (bottom): cascade from left/right if provided, then content
+        if let color = parsedNavBarBg {
             navigationBarBackgroundColor = color
-        } else if navigationBarBackgroundColor == nil && contentBackgroundColor != nil {
-            navigationBarBackgroundColor = contentBackgroundColor
+        } else if navigationBarBackgroundColor == nil {
+            // Try to use left or right as fallback
+            if let left = parsedNavBarLeftBg {
+                navigationBarBackgroundColor = left
+            } else if let right = parsedNavBarRightBg {
+                navigationBarBackgroundColor = right
+            } else if let content = contentBackgroundColor {
+                navigationBarBackgroundColor = content
+            }
         }
         
-        // Navigation bar left (landscape): cascade from navigationBarBackgroundColor
-        if let bg = navigationBarLeftBg, let color = UIColor.fromHex(bg) {
+        // Navigation bar left (landscape): cascade from right -> navBar -> content
+        if let color = parsedNavBarLeftBg {
             navigationBarLeftBackgroundColor = color
-        } else if navigationBarLeftBackgroundColor == nil && navigationBarBackgroundColor != nil {
-            navigationBarLeftBackgroundColor = navigationBarBackgroundColor
-        } else if navigationBarLeftBackgroundColor == nil && contentBackgroundColor != nil {
-            navigationBarLeftBackgroundColor = contentBackgroundColor
+        } else if navigationBarLeftBackgroundColor == nil {
+            if let right = parsedNavBarRightBg {
+                navigationBarLeftBackgroundColor = right
+            } else if let navBar = navigationBarBackgroundColor {
+                navigationBarLeftBackgroundColor = navBar
+            } else if let content = contentBackgroundColor {
+                navigationBarLeftBackgroundColor = content
+            }
         }
         
-        // Navigation bar right (landscape): cascade from navigationBarBackgroundColor
-        if let bg = navigationBarRightBg, let color = UIColor.fromHex(bg) {
+        // Navigation bar right (landscape): cascade from left -> navBar -> content
+        if let color = parsedNavBarRightBg {
             navigationBarRightBackgroundColor = color
-        } else if navigationBarRightBackgroundColor == nil && navigationBarBackgroundColor != nil {
-            navigationBarRightBackgroundColor = navigationBarBackgroundColor
-        } else if navigationBarRightBackgroundColor == nil && contentBackgroundColor != nil {
-            navigationBarRightBackgroundColor = contentBackgroundColor
+        } else if navigationBarRightBackgroundColor == nil {
+            if let left = parsedNavBarLeftBg {
+                navigationBarRightBackgroundColor = left
+            } else if let navBar = navigationBarBackgroundColor {
+                navigationBarRightBackgroundColor = navBar
+            } else if let content = contentBackgroundColor {
+                navigationBarRightBackgroundColor = content
+            }
         }
         
-        // Cutout: if not provided, use status bar, then content background
+        // Cutout: cascade from status bar -> content
         if let bg = cutoutBg, let color = UIColor.fromHex(bg) {
             cutoutBackgroundColor = color
-        } else if statusBarBackgroundColor != nil {
-            cutoutBackgroundColor = statusBarBackgroundColor
-        } else {
-            cutoutBackgroundColor = contentBackgroundColor
+        } else if cutoutBackgroundColor == nil {
+            if let statusBar = statusBarBackgroundColor {
+                cutoutBackgroundColor = statusBar
+            } else if let content = contentBackgroundColor {
+                cutoutBackgroundColor = content
+            }
         }
     }
     

@@ -178,7 +178,7 @@ export interface SystemUIConfiguration {
    *
    * Accepts hex color strings: `'#RRGGBB'` or `'#RRGGBBAA'`
    *
-   * If not provided, defaults to `navigationBarBackgroundColor`, then `contentBackgroundColor`.
+   * Cascade order: `navigationBarRightBackgroundColor` → `navigationBarBackgroundColor` → `contentBackgroundColor`
    */
   navigationBarLeftBackgroundColor?: string;
 
@@ -190,7 +190,7 @@ export interface SystemUIConfiguration {
    *
    * Accepts hex color strings: `'#RRGGBB'` or `'#RRGGBBAA'`
    *
-   * If not provided, defaults to `navigationBarBackgroundColor`, then `contentBackgroundColor`.
+   * Cascade order: `navigationBarLeftBackgroundColor` → `navigationBarBackgroundColor` → `contentBackgroundColor`
    */
   navigationBarRightBackgroundColor?: string;
 
@@ -205,6 +205,22 @@ export interface SystemUIConfiguration {
    * If not provided, defaults to `statusBarBackgroundColor`, then `contentBackgroundColor`.
    */
   cutoutBackgroundColor?: string;
+
+  // ---- Corner Radius ----
+
+  /**
+   * Corner radius for the content area in landscape mode (in dp).
+   *
+   * When set, the content area will have rounded corners on the side(s)
+   * with display cutouts in landscape orientation. This creates a smooth
+   * visual transition between the cutout area and the app content.
+   *
+   * Recommended values: 16-24 dp for a subtle effect, 32+ dp for more pronounced rounding.
+   *
+   * @default 0 (no rounding)
+   * @platform Android
+   */
+  contentCornerRadius?: number;
 }
 
 /**
@@ -213,33 +229,45 @@ export interface SystemUIConfiguration {
 export interface BackgroundColorsOptions {
   /**
    * Background color for the main content area.
+   * This is the base color that cascades to all other areas if not specified.
    */
   contentBackgroundColor?: string;
 
   /**
    * Background color for the status bar area.
+   * Cascade: `contentBackgroundColor`
    */
   statusBarBackgroundColor?: string;
 
   /**
    * Background color for the navigation bar area (bottom).
+   * Cascade: `navigationBarLeftBackgroundColor` → `navigationBarRightBackgroundColor` → `contentBackgroundColor`
    */
   navigationBarBackgroundColor?: string;
 
   /**
    * Background color for the left system bar (landscape).
+   * Cascade: `navigationBarRightBackgroundColor` → `navigationBarBackgroundColor` → `contentBackgroundColor`
    */
   navigationBarLeftBackgroundColor?: string;
 
   /**
    * Background color for the right system bar (landscape).
+   * Cascade: `navigationBarLeftBackgroundColor` → `navigationBarBackgroundColor` → `contentBackgroundColor`
    */
   navigationBarRightBackgroundColor?: string;
 
   /**
    * Background color for the display cutout area.
+   * Cascade: `statusBarBackgroundColor` → `contentBackgroundColor`
    */
   cutoutBackgroundColor?: string;
+
+  /**
+   * Corner radius for the content area in landscape mode (in dp).
+   * @platform Android
+   */
+  contentCornerRadius?: number;
 }
 
 /**
