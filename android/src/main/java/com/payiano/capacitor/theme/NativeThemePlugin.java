@@ -132,11 +132,16 @@ public class NativeThemePlugin extends Plugin {
         super.load();
         // Initialize color scheme on plugin load
         currentColorScheme = getSystemColorScheme();
+        // Detect device corner radius
+        detectDeviceCornerRadius();
     }
 
     @Override
     public void handleOnConfigurationChanged(Configuration newConfig) {
         super.handleOnConfigurationChanged(newConfig);
+
+        // Re-detect corner radius on configuration change (orientation change)
+        detectDeviceCornerRadius();
 
         // Check for color scheme changes
         String newColorScheme = getSystemColorScheme();
@@ -784,18 +789,32 @@ public class NativeThemePlugin extends Plugin {
     /**
      * Apply corner radius to content view for cutout areas.
      * The radius is applied on sides with cutouts in landscape mode.
+     * If contentCornerRadius is -1 (default), uses the device's display corner radius.
      */
     private void applyContentCornerRadius(View contentView) {
-        if (contentCornerRadius <= 0) {
-            // Remove any existing outline
+        // Determine the effective radius
+        float effectiveRadiusPx;
+
+        if (contentCornerRadius < 0) {
+            // Use device corner radius (already in pixels)
+            effectiveRadiusPx = deviceCornerRadiusPx;
+        } else if (contentCornerRadius == 0) {
+            // Explicitly disabled
+            contentView.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+            contentView.setClipToOutline(false);
+            return;
+        } else {
+            // Convert dp to pixels
+            float density = getContext().getResources().getDisplayMetrics().density;
+            effectiveRadiusPx = contentCornerRadius * density;
+        }
+
+        // If no radius available, skip
+        if (effectiveRadiusPx <= 0) {
             contentView.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
             contentView.setClipToOutline(false);
             return;
         }
-
-        // Convert dp to pixels
-        float density = getContext().getResources().getDisplayMetrics().density;
-        final float radiusPx = contentCornerRadius * density;
 
         // Check if we're in landscape and have cutouts
         boolean isLandscape = getContext().getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
@@ -809,18 +828,14 @@ public class NativeThemePlugin extends Plugin {
             return;
         }
 
+        final float radiusPx = effectiveRadiusPx;
+
         contentView.setOutlineProvider(
             new ViewOutlineProvider() {
                 @Override
                 public void getOutline(View view, Outline outline) {
                     int width = view.getWidth();
                     int height = view.getHeight();
-
-                    // Calculate corner radii based on cutout positions
-                    float topLeft = hasLeftCutout ? radiusPx : 0;
-                    float topRight = hasRightCutout ? radiusPx : 0;
-                    float bottomLeft = hasLeftCutout ? radiusPx : 0;
-                    float bottomRight = hasRightCutout ? radiusPx : 0;
 
                     // Use uniform radius if both sides have cutouts
                     if (hasLeftCutout && hasRightCutout) {
@@ -836,6 +851,46 @@ public class NativeThemePlugin extends Plugin {
             }
         );
         contentView.setClipToOutline(true);
+    }
+
+    /**
+     * Detect the device's display corner radius.
+     * Available on Android 12 (API 31) and above.
+     */
+    private void detectDeviceCornerRadius() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                Window window = getWindow();
+                View decorView = window.getDecorView();
+
+                // Get the window insets
+                android.view.WindowInsets windowInsets = decorView.getRootWindowInsets();
+                if (windowInsets != null) {
+                    // Try to get corner radius from different positions
+                    RoundedCorner topLeft = windowInsets.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT);
+                    RoundedCorner topRight = windowInsets.getRoundedCorner(RoundedCorner.POSITION_TOP_RIGHT);
+                    RoundedCorner bottomLeft = windowInsets.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_LEFT);
+                    RoundedCorner bottomRight = windowInsets.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_RIGHT);
+
+                    // Use the maximum corner radius found
+                    float maxRadius = 0;
+                    if (topLeft != null) maxRadius = Math.max(maxRadius, topLeft.getRadius());
+                    if (topRight != null) maxRadius = Math.max(maxRadius, topRight.getRadius());
+                    if (bottomLeft != null) maxRadius = Math.max(maxRadius, bottomLeft.getRadius());
+                    if (bottomRight != null) maxRadius = Math.max(maxRadius, bottomRight.getRadius());
+
+                    deviceCornerRadiusPx = maxRadius;
+                }
+            } catch (Exception e) {
+                // Fallback to a reasonable default (24dp) if detection fails
+                float density = getContext().getResources().getDisplayMetrics().density;
+                deviceCornerRadiusPx = 24 * density;
+            }
+        } else {
+            // For older Android versions, use a reasonable default (24dp)
+            float density = getContext().getResources().getDisplayMetrics().density;
+            deviceCornerRadiusPx = 24 * density;
+        }
     }
 
     // ============================================

@@ -215,9 +215,12 @@ export interface SystemUIConfiguration {
    * with display cutouts in landscape orientation. This creates a smooth
    * visual transition between the cutout area and the app content.
    *
-   * Recommended values: 16-24 dp for a subtle effect, 32+ dp for more pronounced rounding.
+   * Special values:
+   * - `-1` or `undefined`: Use the device's display corner radius (default)
+   * - `0`: Disable corner rounding
+   * - `> 0`: Use the specified value in dp
    *
-   * @default 0 (no rounding)
+   * @default -1 (uses device corner radius)
    * @platform Android
    */
   contentCornerRadius?: number;
@@ -265,6 +268,7 @@ export interface BackgroundColorsOptions {
 
   /**
    * Corner radius for the content area in landscape mode (in dp).
+   * -1 = use device corner radius (default), 0 = disabled, >0 = custom value
    * @platform Android
    */
   contentCornerRadius?: number;
