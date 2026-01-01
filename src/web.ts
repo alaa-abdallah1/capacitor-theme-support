@@ -182,8 +182,6 @@ export class SystemUIWeb extends WebPlugin implements SystemUIPlugin {
       isStatusBarVisible: true,
       isNavigationBarVisible: true,
       colorScheme: this.getCurrentColorScheme(),
-      contentCornerRadius: -1,
-      deviceCornerRadius: 0,
     };
   }
 

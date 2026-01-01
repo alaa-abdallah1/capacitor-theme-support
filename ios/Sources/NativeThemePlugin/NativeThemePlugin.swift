@@ -58,16 +58,6 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     private var navigationBarBackgroundColor: UIColor? // Home indicator area on iOS
     private var navigationBarLeftBackgroundColor: UIColor? // Left inset in landscape
     private var navigationBarRightBackgroundColor: UIColor? // Right inset in landscape
-    
-    // ============================================
-    // Corner Radius Configuration
-    // ============================================
-    
-    /// Content corner radius in points. -1 means use device default, 0 means disabled.
-    private var contentCornerRadius: CGFloat = -1
-    
-    /// Device display corner radius in points. Detected from device screen.
-    private var deviceCornerRadius: CGFloat = 0
     private var cutoutBackgroundColor: UIColor? // Dynamic Island/Notch area
     
     // ============================================
@@ -88,9 +78,6 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         
         // Initialize color scheme
         currentColorScheme = getSystemColorScheme()
-        
-        // Detect device corner radius
-        detectDeviceCornerRadius()
         
         // Listen for trait changes (including dark mode)
         NotificationCenter.default.addObserver(
@@ -131,7 +118,6 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         let navigationBarLeftBg = call.getString("navigationBarLeftBackgroundColor")
         let navigationBarRightBg = call.getString("navigationBarRightBackgroundColor")
         let cutoutBg = call.getString("cutoutBackgroundColor")
-        let cornerRadius = call.getFloat("contentCornerRadius")
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else {
@@ -142,11 +128,6 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             // Handle edge-to-edge mode
             if let enabled = edgeToEdge {
                 self.configureEdgeToEdge(enabled: enabled)
-            }
-            
-            // Handle content corner radius
-            if let radius = cornerRadius {
-                self.contentCornerRadius = CGFloat(radius)
             }
             
             // Parse and store colors
@@ -161,9 +142,6 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             
             // Apply background colors
             self.applyBackgroundColors()
-            
-            // Apply content corner radius
-            self.applyContentCornerRadius()
             
             // Handle visibility
             if let visible = statusBarVisible {
@@ -306,10 +284,6 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             
             // Color scheme
             result["colorScheme"] = self.currentColorScheme
-            
-            // Corner radius values
-            result["contentCornerRadius"] = self.contentCornerRadius
-            result["deviceCornerRadius"] = self.deviceCornerRadius
             
             call.resolve(result)
         }
@@ -586,106 +560,6 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         var data = JSObject()
         data["colorScheme"] = colorScheme
         notifyListeners(EVENT_COLOR_SCHEME_CHANGED, data: data)
-    }
-    
-    // ============================================
-    // CORNER RADIUS HELPERS
-    // ============================================
-    
-    /**
-     * Detect the device's display corner radius.
-     * Uses private API on iOS to get actual screen corner radius.
-     */
-    private func detectDeviceCornerRadius() {
-        if #available(iOS 13.0, *) {
-            // Try to get corner radius from the display
-            // iOS doesn't have a public API for this, so we use a known default
-            // based on device type. Modern iPhones with notch/dynamic island have ~40pt corners.
-            let window = getKeyWindow()
-            let screen = window?.screen ?? UIScreen.main
-            
-            // Check if device has safe area (indicates modern iPhone with rounded corners)
-            let safeAreaInsets = window?.safeAreaInsets ?? UIEdgeInsets.zero
-            
-            if safeAreaInsets.top > 20 {
-                // Modern iPhone with notch/dynamic island - use 40pt
-                deviceCornerRadius = 40
-            } else if safeAreaInsets.bottom > 0 {
-                // iPhone X-style home indicator - use 40pt
-                deviceCornerRadius = 40
-            } else {
-                // Older device or iPad - no corner radius or minimal
-                deviceCornerRadius = 0
-            }
-        } else {
-            // Pre-iOS 13 devices don't have rounded corners
-            deviceCornerRadius = 0
-        }
-    }
-    
-    /**
-     * Apply corner radius to the content view.
-     * Only applies in landscape mode when there are cutouts on the sides.
-     */
-    private func applyContentCornerRadius() {
-        guard let webView = bridge?.webView else { return }
-        
-        // Determine effective radius
-        let effectiveRadius: CGFloat
-        if contentCornerRadius < 0 {
-            // Use device corner radius
-            effectiveRadius = deviceCornerRadius
-        } else if contentCornerRadius == 0 {
-            // Disabled
-            webView.layer.cornerRadius = 0
-            webView.layer.maskedCorners = []
-            webView.clipsToBounds = false
-            return
-        } else {
-            effectiveRadius = contentCornerRadius
-        }
-        
-        // Skip if no radius
-        if effectiveRadius <= 0 {
-            webView.layer.cornerRadius = 0
-            webView.layer.maskedCorners = []
-            webView.clipsToBounds = false
-            return
-        }
-        
-        // Check orientation and cutouts
-        let window = getKeyWindow()
-        let safeAreaInsets = window?.safeAreaInsets ?? UIEdgeInsets.zero
-        let isLandscape = UIDevice.current.orientation.isLandscape ||
-                          (window?.frame.width ?? 0) > (window?.frame.height ?? 0)
-        
-        let hasLeftCutout = safeAreaInsets.left > 0
-        let hasRightCutout = safeAreaInsets.right > 0
-        
-        if !isLandscape || (!hasLeftCutout && !hasRightCutout) {
-            // Portrait or no cutouts - remove corner radius
-            webView.layer.cornerRadius = 0
-            webView.layer.maskedCorners = []
-            webView.clipsToBounds = false
-            return
-        }
-        
-        // Apply corner radius only on cutout sides
-        var maskedCorners: CACornerMask = []
-        
-        if hasLeftCutout {
-            maskedCorners.insert(.layerMinXMinYCorner) // Top-left
-            maskedCorners.insert(.layerMinXMaxYCorner) // Bottom-left
-        }
-        
-        if hasRightCutout {
-            maskedCorners.insert(.layerMaxXMinYCorner) // Top-right
-            maskedCorners.insert(.layerMaxXMaxYCorner) // Bottom-right
-        }
-        
-        webView.layer.cornerRadius = effectiveRadius
-        webView.layer.maskedCorners = maskedCorners
-        webView.clipsToBounds = true
     }
 }
 

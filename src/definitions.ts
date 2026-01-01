@@ -205,25 +205,6 @@ export interface SystemUIConfiguration {
    * If not provided, defaults to `statusBarBackgroundColor`, then `contentBackgroundColor`.
    */
   cutoutBackgroundColor?: string;
-
-  // ---- Corner Radius ----
-
-  /**
-   * Corner radius for the content area in landscape mode (in dp).
-   *
-   * When set, the content area will have rounded corners on the side(s)
-   * with display cutouts in landscape orientation. This creates a smooth
-   * visual transition between the cutout area and the app content.
-   *
-   * Special values:
-   * - `-1` or `undefined`: Use the device's display corner radius (default)
-   * - `0`: Disable corner rounding
-   * - `> 0`: Use the specified value in dp
-   *
-   * @default -1 (uses device corner radius)
-   * @platform Android
-   */
-  contentCornerRadius?: number;
 }
 
 /**
@@ -265,13 +246,6 @@ export interface BackgroundColorsOptions {
    * Cascade: `statusBarBackgroundColor` → `contentBackgroundColor`
    */
   cutoutBackgroundColor?: string;
-
-  /**
-   * Corner radius for the content area in landscape mode (in dp).
-   * -1 = use device corner radius (default), 0 = disabled, >0 = custom value
-   * @platform Android
-   */
-  contentCornerRadius?: number;
 }
 
 /**
@@ -447,26 +421,6 @@ export interface SystemUIInfo {
    * Current system color scheme.
    */
   colorScheme: ColorScheme;
-
-  // ---- Corner Radius (dp) ----
-
-  /**
-   * Current content corner radius in dp.
-   *
-   * Returns the configured content corner radius value.
-   * A value of -1 means the device default is being used.
-   * A value of 0 means corner radius is disabled.
-   */
-  contentCornerRadius: number;
-
-  /**
-   * Detected device display corner radius in dp.
-   *
-   * This is the corner radius detected from the device's display.
-   * On Android 12+, this is read from the actual display corners.
-   * On older devices, a default of 24dp is used.
-   */
-  deviceCornerRadius: number;
 }
 
 // ============================================
