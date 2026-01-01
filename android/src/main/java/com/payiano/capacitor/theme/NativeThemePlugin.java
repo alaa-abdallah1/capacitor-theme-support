@@ -1,5 +1,6 @@
 package com.payiano.capacitor.theme;
 
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Build;
 import android.view.Gravity;
@@ -28,12 +29,21 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * - Navigation bar appearance and visibility
  * - Safe area insets
  * - Display cutout (notch) handling
+ * - System color scheme (dark mode) detection
+ * - Landscape orientation support
  *
  * @author Payiano
- * @version 1.0.0
+ * @version 2.0.0
  */
 @CapacitorPlugin(name = "SystemUI")
 public class NativeThemePlugin extends Plugin {
+
+    // ============================================
+    // Constants
+    // ============================================
+
+    /** Event name for color scheme changes */
+    private static final String EVENT_COLOR_SCHEME_CHANGED = "colorSchemeChanged";
 
     // ============================================
     // Configuration State
@@ -50,6 +60,9 @@ public class NativeThemePlugin extends Plugin {
 
     /** Current visibility state of the navigation bar */
     private boolean isNavigationBarVisible = true;
+
+    /** Current system color scheme */
+    private String currentColorScheme = "light";
 
     // ============================================
     // Inset Values (in pixels)
@@ -75,10 +88,16 @@ public class NativeThemePlugin extends Plugin {
     /** Background color for the status bar area */
     private Integer statusBarBackgroundColor = null;
 
-    /** Background color for the navigation bar area */
+    /** Background color for the navigation bar area (bottom) */
     private Integer navigationBarBackgroundColor = null;
 
-    /** Background color for display cutout areas (defaults to content background) */
+    /** Background color for the left navigation bar area (landscape) */
+    private Integer navigationBarLeftBackgroundColor = null;
+
+    /** Background color for the right navigation bar area (landscape) */
+    private Integer navigationBarRightBackgroundColor = null;
+
+    /** Background color for display cutout areas */
     private Integer cutoutBackgroundColor = null;
 
     // ============================================
@@ -94,6 +113,29 @@ public class NativeThemePlugin extends Plugin {
     private static final int NAV_BAR_BOTTOM_OVERLAY_ID = View.generateViewId();
     private static final int NAV_BAR_LEFT_OVERLAY_ID = View.generateViewId();
     private static final int NAV_BAR_RIGHT_OVERLAY_ID = View.generateViewId();
+
+    // ============================================
+    // LIFECYCLE METHODS
+    // ============================================
+
+    @Override
+    public void load() {
+        super.load();
+        // Initialize color scheme on plugin load
+        currentColorScheme = getSystemColorScheme();
+    }
+
+    @Override
+    public void handleOnConfigurationChanged(Configuration newConfig) {
+        super.handleOnConfigurationChanged(newConfig);
+
+        // Check for color scheme changes
+        String newColorScheme = getSystemColorScheme();
+        if (!newColorScheme.equals(currentColorScheme)) {
+            currentColorScheme = newColorScheme;
+            notifyColorSchemeChanged(newColorScheme);
+        }
+    }
 
     // ============================================
     // PUBLIC API METHODS
@@ -114,7 +156,9 @@ public class NativeThemePlugin extends Plugin {
      * - contentBackgroundColor: Main app background color (hex string)
      * - statusBarBackgroundColor: Status bar background (hex string)
      * - navigationBarBackgroundColor: Navigation bar background (hex string)
-     * - cutoutBackgroundColor: Display cutout area background (hex string, defaults to contentBackgroundColor)
+     * - navigationBarLeftBackgroundColor: Left bar background in landscape (hex string)
+     * - navigationBarRightBackgroundColor: Right bar background in landscape (hex string)
+     * - cutoutBackgroundColor: Display cutout area background (hex string)
      *
      * @param call Plugin call containing configuration options
      */
@@ -129,6 +173,8 @@ public class NativeThemePlugin extends Plugin {
         String contentBg = call.getString("contentBackgroundColor");
         String statusBarBg = call.getString("statusBarBackgroundColor");
         String navigationBarBg = call.getString("navigationBarBackgroundColor");
+        String navigationBarLeftBg = call.getString("navigationBarLeftBackgroundColor");
+        String navigationBarRightBg = call.getString("navigationBarRightBackgroundColor");
         String cutoutBg = call.getString("cutoutBackgroundColor");
 
         runOnUI(
@@ -142,7 +188,7 @@ public class NativeThemePlugin extends Plugin {
                     }
 
                     // Parse and store colors
-                    parseAndStoreColors(contentBg, statusBarBg, navigationBarBg, cutoutBg);
+                    parseAndStoreColors(contentBg, statusBarBg, navigationBarBg, navigationBarLeftBg, navigationBarRightBg, cutoutBg);
 
                     // Apply background colors
                     applyBackgroundColors(window);
@@ -173,9 +219,8 @@ public class NativeThemePlugin extends Plugin {
      *
      * Color Behavior:
      * - If only contentBackgroundColor is set: fills entire screen
-     * - If contentBackgroundColor + statusBarBackgroundColor: content fills except status bar
-     * - If contentBackgroundColor + navigationBarBackgroundColor: content fills except nav bar
-     * - If all colors set: each area has its own color
+     * - If navigationBarLeftBackgroundColor not set: uses navigationBarBackgroundColor
+     * - If navigationBarRightBackgroundColor not set: uses navigationBarBackgroundColor
      * - If no color is set for an area: defaults to transparent
      *
      * @param call Plugin call with color options
@@ -185,12 +230,14 @@ public class NativeThemePlugin extends Plugin {
         String contentBg = call.getString("contentBackgroundColor");
         String statusBarBg = call.getString("statusBarBackgroundColor");
         String navigationBarBg = call.getString("navigationBarBackgroundColor");
+        String navigationBarLeftBg = call.getString("navigationBarLeftBackgroundColor");
+        String navigationBarRightBg = call.getString("navigationBarRightBackgroundColor");
         String cutoutBg = call.getString("cutoutBackgroundColor");
 
         runOnUI(
             () -> {
                 try {
-                    parseAndStoreColors(contentBg, statusBarBg, navigationBarBg, cutoutBg);
+                    parseAndStoreColors(contentBg, statusBarBg, navigationBarBg, navigationBarLeftBg, navigationBarRightBg, cutoutBg);
                     applyBackgroundColors(getWindow());
                     call.resolve();
                 } catch (Exception e) {
@@ -317,6 +364,7 @@ public class NativeThemePlugin extends Plugin {
      * - isSafeAreaEnabled: Current safe area state
      * - isStatusBarVisible: Current status bar visibility
      * - isNavigationBarVisible: Current navigation bar visibility
+     * - colorScheme: Current system color scheme ('light' or 'dark')
      *
      * @param call Plugin call
      */
@@ -341,6 +389,24 @@ public class NativeThemePlugin extends Plugin {
         result.put("isStatusBarVisible", isStatusBarVisible);
         result.put("isNavigationBarVisible", isNavigationBarVisible);
 
+        // Color scheme
+        result.put("colorScheme", currentColorScheme);
+
+        call.resolve(result);
+    }
+
+    /**
+     * Get the current system color scheme (dark/light mode).
+     *
+     * Returns:
+     * - colorScheme: 'light' or 'dark'
+     *
+     * @param call Plugin call
+     */
+    @PluginMethod
+    public void getColorScheme(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("colorScheme", currentColorScheme);
         call.resolve(result);
     }
 
@@ -395,7 +461,14 @@ public class NativeThemePlugin extends Plugin {
         }
     }
 
-    private void parseAndStoreColors(String contentBg, String statusBarBg, String navigationBarBg, String cutoutBg) {
+    private void parseAndStoreColors(
+        String contentBg,
+        String statusBarBg,
+        String navigationBarBg,
+        String navigationBarLeftBg,
+        String navigationBarRightBg,
+        String cutoutBg
+    ) {
         // Parse content background
         if (isValidColor(contentBg)) {
             contentBackgroundColor = Color.parseColor(contentBg);
@@ -408,16 +481,36 @@ public class NativeThemePlugin extends Plugin {
             statusBarBackgroundColor = contentBackgroundColor;
         }
 
-        // Navigation bar: if not provided but content is, use content color
+        // Navigation bar (bottom): if not provided but content is, use content color
         if (isValidColor(navigationBarBg)) {
             navigationBarBackgroundColor = Color.parseColor(navigationBarBg);
         } else if (contentBackgroundColor != null && navigationBarBackgroundColor == null) {
             navigationBarBackgroundColor = contentBackgroundColor;
         }
 
-        // Cutout: if not provided, use content background
+        // Navigation bar left (landscape): cascade from navigationBarBackgroundColor
+        if (isValidColor(navigationBarLeftBg)) {
+            navigationBarLeftBackgroundColor = Color.parseColor(navigationBarLeftBg);
+        } else if (navigationBarBackgroundColor != null && navigationBarLeftBackgroundColor == null) {
+            navigationBarLeftBackgroundColor = navigationBarBackgroundColor;
+        } else if (contentBackgroundColor != null && navigationBarLeftBackgroundColor == null) {
+            navigationBarLeftBackgroundColor = contentBackgroundColor;
+        }
+
+        // Navigation bar right (landscape): cascade from navigationBarBackgroundColor
+        if (isValidColor(navigationBarRightBg)) {
+            navigationBarRightBackgroundColor = Color.parseColor(navigationBarRightBg);
+        } else if (navigationBarBackgroundColor != null && navigationBarRightBackgroundColor == null) {
+            navigationBarRightBackgroundColor = navigationBarBackgroundColor;
+        } else if (contentBackgroundColor != null && navigationBarRightBackgroundColor == null) {
+            navigationBarRightBackgroundColor = contentBackgroundColor;
+        }
+
+        // Cutout: if not provided, use status bar, then content background
         if (isValidColor(cutoutBg)) {
             cutoutBackgroundColor = Color.parseColor(cutoutBg);
+        } else if (statusBarBackgroundColor != null) {
+            cutoutBackgroundColor = statusBarBackgroundColor;
         } else {
             cutoutBackgroundColor = contentBackgroundColor;
         }
@@ -548,20 +641,34 @@ public class NativeThemePlugin extends Plugin {
             navBarBottomOverlay.setBackgroundColor(navigationBarBackgroundColor != null ? navigationBarBackgroundColor : Color.TRANSPARENT);
         }
 
+        // Left bar: use cutout color if there's a cutout, otherwise use the left-specific color
         if (navBarLeftOverlay != null) {
-            navBarLeftOverlay.setBackgroundColor(
-                hasLeftCutout
-                    ? effectiveCutoutColor
-                    : (navigationBarBackgroundColor != null ? navigationBarBackgroundColor : Color.TRANSPARENT)
-            );
+            int leftColor;
+            if (hasLeftCutout) {
+                leftColor = effectiveCutoutColor;
+            } else if (navigationBarLeftBackgroundColor != null) {
+                leftColor = navigationBarLeftBackgroundColor;
+            } else if (navigationBarBackgroundColor != null) {
+                leftColor = navigationBarBackgroundColor;
+            } else {
+                leftColor = Color.TRANSPARENT;
+            }
+            navBarLeftOverlay.setBackgroundColor(leftColor);
         }
 
+        // Right bar: use cutout color if there's a cutout, otherwise use the right-specific color
         if (navBarRightOverlay != null) {
-            navBarRightOverlay.setBackgroundColor(
-                hasRightCutout
-                    ? effectiveCutoutColor
-                    : (navigationBarBackgroundColor != null ? navigationBarBackgroundColor : Color.TRANSPARENT)
-            );
+            int rightColor;
+            if (hasRightCutout) {
+                rightColor = effectiveCutoutColor;
+            } else if (navigationBarRightBackgroundColor != null) {
+                rightColor = navigationBarRightBackgroundColor;
+            } else if (navigationBarBackgroundColor != null) {
+                rightColor = navigationBarBackgroundColor;
+            } else {
+                rightColor = Color.TRANSPARENT;
+            }
+            navBarRightOverlay.setBackgroundColor(rightColor);
         }
     }
 
@@ -631,5 +738,37 @@ public class NativeThemePlugin extends Plugin {
         } else {
             contentView.setPadding(0, 0, 0, 0);
         }
+    }
+
+    // ============================================
+    // COLOR SCHEME (DARK MODE) HELPERS
+    // ============================================
+
+    /**
+     * Get the current system color scheme.
+     *
+     * @return "dark" or "light"
+     */
+    private String getSystemColorScheme() {
+        int nightModeFlags = getContext().getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+
+        switch (nightModeFlags) {
+            case Configuration.UI_MODE_NIGHT_YES:
+                return "dark";
+            case Configuration.UI_MODE_NIGHT_NO:
+            default:
+                return "light";
+        }
+    }
+
+    /**
+     * Notify JavaScript listeners of a color scheme change.
+     *
+     * @param colorScheme The new color scheme ("dark" or "light")
+     */
+    private void notifyColorSchemeChanged(String colorScheme) {
+        JSObject data = new JSObject();
+        data.put("colorScheme", colorScheme);
+        notifyListeners(EVENT_COLOR_SCHEME_CHANGED, data);
     }
 }

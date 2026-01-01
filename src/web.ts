@@ -9,17 +9,67 @@ import type {
   NavigationBarVisibilityOptions,
   EdgeToEdgeOptions,
   SystemUIInfo,
+  ColorSchemeResult,
+  ColorSchemeChangeEvent
+} from './definitions';
+import {
+  ColorScheme
 } from './definitions';
 
 /**
  * Web implementation of the SystemUI plugin.
  *
- * Provides basic fallback functionality for web browsers.
- * Most features are no-ops since web browsers don't have native system bars.
+ * Provides fallback functionality for web browsers:
+ * - Color scheme detection using CSS media queries
+ * - Background color application to document body
+ * - Theme-color meta tag updates for mobile browsers
  */
 export class SystemUIWeb extends WebPlugin implements SystemUIPlugin {
   private contentBackgroundColor: string | null = null;
-  private isEdgeToEdgeEnabled: boolean = false;
+  private isEdgeToEdgeEnabled = false;
+  private colorSchemeMediaQuery: MediaQueryList | null = null;
+
+  constructor() {
+    super();
+    this.setupColorSchemeListener();
+  }
+
+  /**
+   * Setup listener for CSS prefers-color-scheme changes.
+   */
+  private setupColorSchemeListener(): void {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      this.colorSchemeMediaQuery = window.matchMedia(
+        '(prefers-color-scheme: dark)',
+      );
+
+      const handler = (event: MediaQueryListEvent) => {
+        const colorScheme = event.matches ? ColorScheme.Dark : ColorScheme.Light;
+        this.notifyListeners('colorSchemeChanged', {
+          colorScheme,
+        } as ColorSchemeChangeEvent);
+      };
+
+      // Modern browsers
+      if (this.colorSchemeMediaQuery.addEventListener) {
+        this.colorSchemeMediaQuery.addEventListener('change', handler);
+      } else {
+        // Fallback for older browsers
+        this.colorSchemeMediaQuery.addListener(handler);
+      }
+    }
+  }
+
+  /**
+   * Get the current color scheme from CSS media query.
+   */
+  private getCurrentColorScheme(): ColorScheme {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      return isDark ? ColorScheme.Dark : ColorScheme.Light;
+    }
+    return ColorScheme.Light;
+  }
 
   /**
    * Configure the system UI (web fallback).
@@ -105,8 +155,18 @@ export class SystemUIWeb extends WebPlugin implements SystemUIPlugin {
   }
 
   /**
+   * Get the current system color scheme (web fallback).
+   * Uses CSS prefers-color-scheme media query.
+   */
+  async getColorScheme(): Promise<ColorSchemeResult> {
+    return {
+      colorScheme: this.getCurrentColorScheme(),
+    };
+  }
+
+  /**
    * Get system UI information (web fallback).
-   * Returns zero values for all insets since web has no system bars.
+   * Returns zero values for insets, uses CSS env() for safe areas.
    */
   async getInfo(): Promise<SystemUIInfo> {
     return {
@@ -121,6 +181,7 @@ export class SystemUIWeb extends WebPlugin implements SystemUIPlugin {
       isSafeAreaEnabled: true,
       isStatusBarVisible: true,
       isNavigationBarVisible: true,
+      colorScheme: this.getCurrentColorScheme(),
     };
   }
 

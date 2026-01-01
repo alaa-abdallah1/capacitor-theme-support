@@ -2,30 +2,106 @@
  * SystemUI - Capacitor plugin for native system UI control
  *
  * This plugin provides comprehensive control over the system UI on Android and iOS,
- * including status bar, navigation bar, and edge-to-edge display mode.
+ * including status bar, navigation bar, edge-to-edge display mode, and color scheme detection.
  *
- * @module @aspect/capacitor-theme-support
+ * Features:
+ * - Edge-to-edge display mode
+ * - Status bar and navigation bar styling
+ * - System color scheme (dark/light mode) detection
+ * - Landscape orientation support with separate controls
+ * - Display cutout (notch/Dynamic Island) handling
+ *
+ * @module capacitor-native-ui
  */
 
+import type { PluginListenerHandle } from '@capacitor/core';
+
+// ============================================
+// ENUMS
+// ============================================
+
 /**
- * Available bar styles for status bar and navigation bar icons/content.
+ * Available styles for system bar icons and content.
  *
- * - `'light'` - Light icons/content on dark background
- * - `'dark'` - Dark icons/content on light background
+ * Use this enum to control the appearance of icons in the status bar and navigation bar.
+ *
+ * @example
+ * ```typescript
+ * import { SystemUI, BarStyle } from 'capacitor-native-ui';
+ *
+ * await SystemUI.configure({
+ *   statusBarStyle: BarStyle.Light,
+ *   navigationBarStyle: BarStyle.Dark
+ * });
+ * ```
  */
-export type BarStyle = 'light' | 'dark';
+export enum BarStyle {
+  /**
+   * Light icons/content - use on DARK backgrounds.
+   * The icons will be white/light colored for visibility on dark surfaces.
+   */
+  Light = 'light',
+
+  /**
+   * Dark icons/content - use on LIGHT backgrounds.
+   * The icons will be black/dark colored for visibility on light surfaces.
+   */
+  Dark = 'dark',
+}
+
+/**
+ * System color scheme (appearance mode).
+ *
+ * Represents the current system-wide color scheme preference.
+ *
+ * @example
+ * ```typescript
+ * import { SystemUI, ColorScheme } from 'capacitor-native-ui';
+ *
+ * const { colorScheme } = await SystemUI.getColorScheme();
+ * if (colorScheme === ColorScheme.Dark) {
+ *   // Apply dark theme
+ * }
+ * ```
+ */
+export enum ColorScheme {
+  /**
+   * Light color scheme (light mode).
+   * System prefers light backgrounds with dark text.
+   */
+  Light = 'light',
+
+  /**
+   * Dark color scheme (dark mode).
+   * System prefers dark backgrounds with light text.
+   */
+  Dark = 'dark',
+}
+
+// ============================================
+// CONFIGURATION INTERFACES
+// ============================================
 
 /**
  * Configuration options for the entire system UI.
+ *
  * Use with the `configure()` method for comprehensive setup in a single call.
+ * All properties are optional - only provided values will be applied.
  */
 export interface SystemUIConfiguration {
+  // ---- Display Mode ----
+
   /**
    * Enable edge-to-edge display mode.
-   * When enabled, content extends behind the status bar and navigation bar.
+   *
+   * When enabled, content extends behind the status bar and navigation bar,
+   * giving you full control over the entire screen area.
+   *
    * @default false
    */
   edgeToEdge?: boolean;
+
+  // ---- Visibility ----
 
   /**
    * Show or hide the status bar.
@@ -35,56 +111,98 @@ export interface SystemUIConfiguration {
 
   /**
    * Show or hide the navigation bar (Android only).
-   * When hidden, user can swipe from bottom edge to temporarily reveal.
+   *
+   * When hidden, user can swipe from bottom/side edge to temporarily reveal it.
+   * On iOS, this has no effect as the home indicator is system-controlled.
+   *
    * @default true
    */
   navigationBarVisible?: boolean;
 
+  // ---- Bar Styles (Icon Colors) ----
+
   /**
    * Style of the status bar icons/content.
-   * - `'light'` - Light icons (use on dark backgrounds)
-   * - `'dark'` - Dark icons (use on light backgrounds)
+   *
+   * - `BarStyle.Light` - Light icons (use on DARK backgrounds)
+   * - `BarStyle.Dark` - Dark icons (use on LIGHT backgrounds)
    */
   statusBarStyle?: BarStyle;
 
   /**
    * Style of the navigation bar icons/buttons (Android only).
-   * - `'light'` - Light icons (use on dark backgrounds)
-   * - `'dark'` - Dark icons (use on light backgrounds)
+   *
+   * - `BarStyle.Light` - Light icons (use on DARK backgrounds)
+   * - `BarStyle.Dark` - Dark icons (use on LIGHT backgrounds)
    */
   navigationBarStyle?: BarStyle;
 
+  // ---- Background Colors (Portrait) ----
+
   /**
    * Background color for the main content area.
+   *
    * Accepts hex color strings: `'#RRGGBB'` or `'#RRGGBBAA'`
    *
-   * If only this color is provided, it will be used for status bar,
-   * navigation bar, and cutout areas as well.
+   * If this is the only color provided, it will cascade to all other areas
+   * (status bar, navigation bar, cutout, and landscape bars).
    */
   contentBackgroundColor?: string;
 
   /**
-   * Background color for the status bar area.
+   * Background color for the status bar area (top of screen).
+   *
    * Accepts hex color strings: `'#RRGGBB'` or `'#RRGGBBAA'`
    *
-   * If not provided, defaults to `contentBackgroundColor` value.
+   * If not provided, defaults to `contentBackgroundColor`.
    */
   statusBarBackgroundColor?: string;
 
   /**
-   * Background color for the navigation bar area.
+   * Background color for the navigation bar area (bottom of screen).
+   *
    * On iOS, this affects the home indicator area.
    * Accepts hex color strings: `'#RRGGBB'` or `'#RRGGBBAA'`
    *
-   * If not provided, defaults to `contentBackgroundColor` value.
+   * If not provided, defaults to `contentBackgroundColor`.
    */
   navigationBarBackgroundColor?: string;
 
+  // ---- Background Colors (Landscape) ----
+
   /**
-   * Background color for the display cutout (notch/Dynamic Island) area.
+   * Background color for the LEFT system bar area in landscape orientation.
+   *
+   * On Android, the navigation bar may appear on the left in landscape mode.
+   * This also covers any left-side display cutout.
+   *
    * Accepts hex color strings: `'#RRGGBB'` or `'#RRGGBBAA'`
    *
-   * If not provided, defaults to `contentBackgroundColor` value.
+   * If not provided, defaults to `navigationBarBackgroundColor`, then `contentBackgroundColor`.
+   */
+  navigationBarLeftBackgroundColor?: string;
+
+  /**
+   * Background color for the RIGHT system bar area in landscape orientation.
+   *
+   * On Android, the navigation bar may appear on the right in landscape mode.
+   * This also covers any right-side display cutout.
+   *
+   * Accepts hex color strings: `'#RRGGBB'` or `'#RRGGBBAA'`
+   *
+   * If not provided, defaults to `navigationBarBackgroundColor`, then `contentBackgroundColor`.
+   */
+  navigationBarRightBackgroundColor?: string;
+
+  // ---- Display Cutout ----
+
+  /**
+   * Background color for the display cutout (notch/Dynamic Island) area.
+   *
+   * This specifically targets the cutout region, separate from the status bar.
+   * Accepts hex color strings: `'#RRGGBB'` or `'#RRGGBBAA'`
+   *
+   * If not provided, defaults to `statusBarBackgroundColor`, then `contentBackgroundColor`.
    */
   cutoutBackgroundColor?: string;
 }
@@ -95,25 +213,31 @@ export interface SystemUIConfiguration {
 export interface BackgroundColorsOptions {
   /**
    * Background color for the main content area.
-   * Accepts hex color strings: `'#RRGGBB'` or `'#RRGGBBAA'`
    */
   contentBackgroundColor?: string;
 
   /**
    * Background color for the status bar area.
-   * Accepts hex color strings: `'#RRGGBB'` or `'#RRGGBBAA'`
    */
   statusBarBackgroundColor?: string;
 
   /**
-   * Background color for the navigation bar area.
-   * Accepts hex color strings: `'#RRGGBB'` or `'#RRGGBBAA'`
+   * Background color for the navigation bar area (bottom).
    */
   navigationBarBackgroundColor?: string;
 
   /**
+   * Background color for the left system bar (landscape).
+   */
+  navigationBarLeftBackgroundColor?: string;
+
+  /**
+   * Background color for the right system bar (landscape).
+   */
+  navigationBarRightBackgroundColor?: string;
+
+  /**
    * Background color for the display cutout area.
-   * Accepts hex color strings: `'#RRGGBB'` or `'#RRGGBBAA'`
    */
   cutoutBackgroundColor?: string;
 }
@@ -149,7 +273,8 @@ export interface StatusBarVisibilityOptions {
 export interface NavigationBarVisibilityOptions {
   /**
    * Whether the navigation bar should be visible.
-   * On Android, when hidden, user can swipe from bottom to temporarily reveal.
+   *
+   * On Android, when hidden, user can swipe from bottom/side to temporarily reveal.
    * On iOS, this option has no effect.
    */
   visible: boolean;
@@ -161,15 +286,62 @@ export interface NavigationBarVisibilityOptions {
 export interface EdgeToEdgeOptions {
   /**
    * Whether edge-to-edge mode should be enabled.
+   *
    * When enabled, content extends behind system bars.
    */
   enabled: boolean;
 }
 
+// ============================================
+// COLOR SCHEME (DARK MODE) INTERFACES
+// ============================================
+
+/**
+ * Result from `getColorScheme()` containing the current system color scheme.
+ */
+export interface ColorSchemeResult {
+  /**
+   * The current system color scheme (light or dark).
+   */
+  colorScheme: ColorScheme;
+}
+
+/**
+ * Event data emitted when the system color scheme changes.
+ *
+ * Listen to this event to react to dark/light mode changes.
+ *
+ * @example
+ * ```typescript
+ * SystemUI.addListener('colorSchemeChanged', (event) => {
+ *   console.log('Color scheme changed to:', event.colorScheme);
+ *   if (event.colorScheme === ColorScheme.Dark) {
+ *     applyDarkTheme();
+ *   } else {
+ *     applyLightTheme();
+ *   }
+ * });
+ * ```
+ */
+export interface ColorSchemeChangeEvent {
+  /**
+   * The new color scheme after the change.
+   */
+  colorScheme: ColorScheme;
+}
+
+// ============================================
+// SYSTEM INFO INTERFACE
+// ============================================
+
 /**
  * System UI information returned by `getInfo()`.
+ *
+ * Contains inset values (in pixels) and current state of the system UI.
  */
 export interface SystemUIInfo {
+  // ---- Inset Values (pixels) ----
+
   /**
    * Height of the status bar in pixels.
    */
@@ -177,24 +349,32 @@ export interface SystemUIInfo {
 
   /**
    * Height of the navigation bar in pixels.
+   *
    * On iOS, this represents the home indicator area height.
    */
   navigationBarHeight: number;
 
   /**
    * Left system inset in pixels.
-   * Used in landscape mode when navigation bar is on the left.
+   *
+   * Used in landscape mode when navigation bar is on the left,
+   * or for left-side display cutouts.
    */
   leftInset: number;
 
   /**
    * Right system inset in pixels.
-   * Used in landscape mode when navigation bar is on the right.
+   *
+   * Used in landscape mode when navigation bar is on the right,
+   * or for right-side display cutouts.
    */
   rightInset: number;
 
+  // ---- Display Cutout Values (pixels) ----
+
   /**
    * Height of the display cutout at the top in pixels.
+   *
    * Represents notch, Dynamic Island, or camera cutout height.
    */
   cutoutTop: number;
@@ -208,6 +388,8 @@ export interface SystemUIInfo {
    * Width of the display cutout at the right in pixels.
    */
   cutoutRight: number;
+
+  // ---- State ----
 
   /**
    * Whether edge-to-edge mode is currently enabled.
@@ -228,35 +410,53 @@ export interface SystemUIInfo {
    * Whether the navigation bar is currently visible (Android only).
    */
   isNavigationBarVisible: boolean;
+
+  /**
+   * Current system color scheme.
+   */
+  colorScheme: ColorScheme;
 }
+
+// ============================================
+// PLUGIN INTERFACE
+// ============================================
 
 /**
  * SystemUI plugin interface.
  *
- * Provides methods for controlling the native system UI including status bar,
- * navigation bar, and edge-to-edge display mode.
+ * Provides methods for controlling the native system UI including:
+ * - Status bar and navigation bar appearance
+ * - Edge-to-edge display mode
+ * - System color scheme (dark mode) detection
+ * - Landscape orientation support
  *
  * @example
  * ```typescript
- * import { SystemUI } from '@aspect/capacitor-theme-support';
+ * import { SystemUI, BarStyle, ColorScheme } from 'capacitor-native-ui';
  *
  * // Configure everything at once
  * await SystemUI.configure({
  *   edgeToEdge: true,
- *   statusBarStyle: 'light',
+ *   statusBarStyle: BarStyle.Light,
  *   contentBackgroundColor: '#1a1a2e',
  *   statusBarBackgroundColor: '#16213e',
  *   navigationBarBackgroundColor: '#0f3460'
  * });
  *
- * // Or configure individual aspects
- * await SystemUI.setEdgeToEdge({ enabled: true });
- * await SystemUI.setBackgroundColors({
- *   contentBackgroundColor: '#ffffff'
+ * // Listen for color scheme changes
+ * SystemUI.addListener('colorSchemeChanged', (event) => {
+ *   console.log('Theme changed to:', event.colorScheme);
  * });
+ *
+ * // Get current color scheme
+ * const { colorScheme } = await SystemUI.getColorScheme();
  * ```
  */
 export interface SystemUIPlugin {
+  // ============================================
+  // CONFIGURATION METHODS
+  // ============================================
+
   /**
    * Configure the entire system UI in a single call.
    *
@@ -271,11 +471,13 @@ export interface SystemUIPlugin {
    * await SystemUI.configure({
    *   edgeToEdge: true,
    *   statusBarVisible: true,
-   *   statusBarStyle: 'light',
-   *   navigationBarStyle: 'light',
+   *   statusBarStyle: BarStyle.Light,
+   *   navigationBarStyle: BarStyle.Light,
    *   contentBackgroundColor: '#121212',
    *   statusBarBackgroundColor: '#121212',
-   *   navigationBarBackgroundColor: '#121212'
+   *   navigationBarBackgroundColor: '#121212',
+   *   navigationBarLeftBackgroundColor: '#0a0a0a',
+   *   navigationBarRightBackgroundColor: '#0a0a0a'
    * });
    * ```
    */
@@ -286,8 +488,7 @@ export interface SystemUIPlugin {
    *
    * Colors cascade from content to other areas if not specified:
    * - If only `contentBackgroundColor` is set, it applies to all areas
-   * - If `statusBarBackgroundColor` is not set, uses `contentBackgroundColor`
-   * - If `navigationBarBackgroundColor` is not set, uses `contentBackgroundColor`
+   * - Other areas default to their parent color if not explicitly set
    *
    * @param options - Background color options
    * @returns Promise that resolves when colors are applied
@@ -299,11 +500,13 @@ export interface SystemUIPlugin {
    *   contentBackgroundColor: '#ffffff'
    * });
    *
-   * // Set different colors for each area
+   * // Set different colors for portrait and landscape
    * await SystemUI.setBackgroundColors({
    *   contentBackgroundColor: '#ffffff',
    *   statusBarBackgroundColor: '#f5f5f5',
-   *   navigationBarBackgroundColor: '#e0e0e0'
+   *   navigationBarBackgroundColor: '#e0e0e0',
+   *   navigationBarLeftBackgroundColor: '#d0d0d0',
+   *   navigationBarRightBackgroundColor: '#d0d0d0'
    * });
    * ```
    */
@@ -312,8 +515,8 @@ export interface SystemUIPlugin {
   /**
    * Set the style (icon/content color) for system bars.
    *
-   * Use `'light'` style when your bar has a dark background.
-   * Use `'dark'` style when your bar has a light background.
+   * Use `BarStyle.Light` when your bar has a DARK background.
+   * Use `BarStyle.Dark` when your bar has a LIGHT background.
    *
    * @param options - Bar style options
    * @returns Promise that resolves when styles are applied
@@ -322,18 +525,16 @@ export interface SystemUIPlugin {
    * ```typescript
    * // Dark theme: light icons on dark background
    * await SystemUI.setBarStyles({
-   *   statusBarStyle: 'light',
-   *   navigationBarStyle: 'light'
-   * });
-   *
-   * // Light theme: dark icons on light background
-   * await SystemUI.setBarStyles({
-   *   statusBarStyle: 'dark',
-   *   navigationBarStyle: 'dark'
+   *   statusBarStyle: BarStyle.Light,
+   *   navigationBarStyle: BarStyle.Light
    * });
    * ```
    */
   setBarStyles(options: BarStylesOptions): Promise<void>;
+
+  // ============================================
+  // VISIBILITY METHODS
+  // ============================================
 
   /**
    * Show or hide the status bar.
@@ -342,22 +543,13 @@ export interface SystemUIPlugin {
    *
    * @param options - Visibility options
    * @returns Promise that resolves when visibility is changed
-   *
-   * @example
-   * ```typescript
-   * // Hide status bar
-   * await SystemUI.setStatusBarVisibility({ visible: false });
-   *
-   * // Show status bar
-   * await SystemUI.setStatusBarVisibility({ visible: true });
-   * ```
    */
   setStatusBarVisibility(options: StatusBarVisibilityOptions): Promise<void>;
 
   /**
    * Show or hide the navigation bar (Android only).
    *
-   * When hidden on Android, the user can swipe from the bottom edge
+   * When hidden on Android, the user can swipe from the bottom/side edge
    * to temporarily reveal the navigation bar.
    *
    * On iOS, this method has no effect as there's no equivalent
@@ -365,12 +557,6 @@ export interface SystemUIPlugin {
    *
    * @param options - Visibility options
    * @returns Promise that resolves when visibility is changed
-   *
-   * @example
-   * ```typescript
-   * // Hide navigation bar (Android only)
-   * await SystemUI.setNavigationBarVisibility({ visible: false });
-   * ```
    */
   setNavigationBarVisibility(
     options: NavigationBarVisibilityOptions,
@@ -390,14 +576,37 @@ export interface SystemUIPlugin {
    *
    * @param options - Edge-to-edge options
    * @returns Promise that resolves when mode is changed
+   */
+  setEdgeToEdge(options: EdgeToEdgeOptions): Promise<void>;
+
+  // ============================================
+  // COLOR SCHEME (DARK MODE) METHODS
+  // ============================================
+
+  /**
+   * Get the current system color scheme (dark/light mode).
+   *
+   * This returns the system-wide color scheme preference, which corresponds
+   * to the CSS `prefers-color-scheme` media query on the web.
+   *
+   * @returns Promise that resolves with the current color scheme
    *
    * @example
    * ```typescript
-   * // Enable edge-to-edge mode
-   * await SystemUI.setEdgeToEdge({ enabled: true });
+   * const { colorScheme } = await SystemUI.getColorScheme();
+   *
+   * if (colorScheme === ColorScheme.Dark) {
+   *   applyDarkTheme();
+   * } else {
+   *   applyLightTheme();
+   * }
    * ```
    */
-  setEdgeToEdge(options: EdgeToEdgeOptions): Promise<void>;
+  getColorScheme(): Promise<ColorSchemeResult>;
+
+  // ============================================
+  // INFO METHODS
+  // ============================================
 
   /**
    * Get current system UI information.
@@ -411,8 +620,50 @@ export interface SystemUIPlugin {
    * ```typescript
    * const info = await SystemUI.getInfo();
    * console.log('Status bar height:', info.statusBarHeight);
-   * console.log('Is edge-to-edge:', info.isEdgeToEdgeEnabled);
+   * console.log('Is dark mode:', info.colorScheme === ColorScheme.Dark);
    * ```
    */
   getInfo(): Promise<SystemUIInfo>;
+
+  // ============================================
+  // EVENT LISTENERS
+  // ============================================
+
+  /**
+   * Add a listener for color scheme (dark mode) changes.
+   *
+   * This fires whenever the system switches between light and dark mode.
+   * Use this to update your app's theme in real-time.
+   *
+   * @param eventName - The event name: 'colorSchemeChanged'
+   * @param listenerFunc - Callback function receiving the new color scheme
+   * @returns Promise resolving to a handle for removing the listener
+   *
+   * @example
+   * ```typescript
+   * const handle = await SystemUI.addListener('colorSchemeChanged', (event) => {
+   *   console.log('Color scheme changed to:', event.colorScheme);
+   *
+   *   if (event.colorScheme === ColorScheme.Dark) {
+   *     document.body.classList.add('dark');
+   *   } else {
+   *     document.body.classList.remove('dark');
+   *   }
+   * });
+   *
+   * // Later, to remove the listener:
+   * handle.remove();
+   * ```
+   */
+  addListener(
+    eventName: 'colorSchemeChanged',
+    listenerFunc: (event: ColorSchemeChangeEvent) => void,
+  ): Promise<PluginListenerHandle>;
+
+  /**
+   * Remove all listeners for a specific event or all events.
+   *
+   * @param eventName - Optional event name to remove listeners for
+   */
+  removeAllListeners(eventName?: 'colorSchemeChanged'): Promise<void>;
 }

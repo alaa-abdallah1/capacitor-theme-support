@@ -5,18 +5,28 @@ import type { SystemUIPlugin } from './definitions';
 /**
  * SystemUI - Capacitor plugin for native system UI control
  *
- * Provides comprehensive control over the system UI on Android and iOS,
- * including status bar, navigation bar, and edge-to-edge display mode.
+ * Provides comprehensive control over the system UI on Android and iOS:
+ * - Status bar and navigation bar appearance
+ * - Edge-to-edge display mode
+ * - System color scheme (dark mode) detection
+ * - Landscape orientation support
  *
  * @example
  * ```typescript
- * import { SystemUI } from '@aspect/capacitor-theme-support';
+ * import { SystemUI, BarStyle, ColorScheme } from 'capacitor-native-ui';
  *
  * // Configure everything at once
  * await SystemUI.configure({
  *   edgeToEdge: true,
- *   statusBarStyle: 'light',
+ *   statusBarStyle: BarStyle.Light,
  *   contentBackgroundColor: '#1a1a2e'
+ * });
+ *
+ * // Listen for dark mode changes
+ * SystemUI.addListener('colorSchemeChanged', (event) => {
+ *   if (event.colorScheme === ColorScheme.Dark) {
+ *     applyDarkTheme();
+ *   }
  * });
  * ```
  */

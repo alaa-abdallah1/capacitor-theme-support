@@ -9,12 +9,14 @@ import UIKit
  * - Edge-to-edge display mode
  * - Status bar appearance and visibility
  * - Safe area insets
+ * - System color scheme (dark mode) detection
+ * - Landscape orientation support
  *
  * Note: iOS does not have a dedicated navigation bar like Android.
  * The home indicator area is handled automatically by iOS.
  *
  * @author Payiano
- * @version 1.0.0
+ * @version 2.0.0
  */
 @objc(NativeThemePlugin)
 public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
@@ -27,8 +29,15 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setStatusBarVisibility", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNavigationBarVisibility", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setEdgeToEdge", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getInfo", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getInfo", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getColorScheme", returnType: CAPPluginReturnPromise)
     ]
+    
+    // ============================================
+    // Constants
+    // ============================================
+    
+    private let EVENT_COLOR_SCHEME_CHANGED = "colorSchemeChanged"
     
     // ============================================
     // Configuration State
@@ -38,6 +47,7 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     private var isSafeAreaEnabled: Bool = true
     private var isStatusBarVisible: Bool = true
     private var isNavigationBarVisible: Bool = true // Always true on iOS (no equivalent)
+    private var currentColorScheme: String = "light"
     
     // ============================================
     // Color Configuration
@@ -46,6 +56,8 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     private var contentBackgroundColor: UIColor?
     private var statusBarBackgroundColor: UIColor?
     private var navigationBarBackgroundColor: UIColor? // Home indicator area on iOS
+    private var navigationBarLeftBackgroundColor: UIColor? // Left inset in landscape
+    private var navigationBarRightBackgroundColor: UIColor? // Right inset in landscape
     private var cutoutBackgroundColor: UIColor? // Dynamic Island/Notch area
     
     // ============================================
@@ -54,6 +66,39 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     
     private var statusBarOverlay: UIView?
     private var bottomOverlay: UIView? // For home indicator area
+    private var leftOverlay: UIView? // For landscape left inset
+    private var rightOverlay: UIView? // For landscape right inset
+    
+    // ============================================
+    // LIFECYCLE METHODS
+    // ============================================
+    
+    public override func load() {
+        super.load()
+        
+        // Initialize color scheme
+        currentColorScheme = getSystemColorScheme()
+        
+        // Listen for trait changes (including dark mode)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTraitCollectionChange),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    @objc private func handleTraitCollectionChange() {
+        let newColorScheme = getSystemColorScheme()
+        if newColorScheme != currentColorScheme {
+            currentColorScheme = newColorScheme
+            notifyColorSchemeChanged(newColorScheme)
+        }
+    }
     
     // ============================================
     // PUBLIC API METHODS
@@ -70,6 +115,8 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         let contentBg = call.getString("contentBackgroundColor")
         let statusBarBg = call.getString("statusBarBackgroundColor")
         let navigationBarBg = call.getString("navigationBarBackgroundColor")
+        let navigationBarLeftBg = call.getString("navigationBarLeftBackgroundColor")
+        let navigationBarRightBg = call.getString("navigationBarRightBackgroundColor")
         let cutoutBg = call.getString("cutoutBackgroundColor")
         
         DispatchQueue.main.async { [weak self] in
@@ -88,6 +135,8 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
                 contentBg: contentBg,
                 statusBarBg: statusBarBg,
                 navigationBarBg: navigationBarBg,
+                navigationBarLeftBg: navigationBarLeftBg,
+                navigationBarRightBg: navigationBarRightBg,
                 cutoutBg: cutoutBg
             )
             
@@ -114,6 +163,8 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         let contentBg = call.getString("contentBackgroundColor")
         let statusBarBg = call.getString("statusBarBackgroundColor")
         let navigationBarBg = call.getString("navigationBarBackgroundColor")
+        let navigationBarLeftBg = call.getString("navigationBarLeftBackgroundColor")
+        let navigationBarRightBg = call.getString("navigationBarRightBackgroundColor")
         let cutoutBg = call.getString("cutoutBackgroundColor")
         
         DispatchQueue.main.async { [weak self] in
@@ -126,6 +177,8 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
                 contentBg: contentBg,
                 statusBarBg: statusBarBg,
                 navigationBarBg: navigationBarBg,
+                navigationBarLeftBg: navigationBarLeftBg,
+                navigationBarRightBg: navigationBarRightBg,
                 cutoutBg: cutoutBg
             )
             self.applyBackgroundColors()
@@ -229,8 +282,20 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             result["isStatusBarVisible"] = self.isStatusBarVisible
             result["isNavigationBarVisible"] = self.isNavigationBarVisible
             
+            // Color scheme
+            result["colorScheme"] = self.currentColorScheme
+            
             call.resolve(result)
         }
+    }
+    
+    /**
+     * Get the current system color scheme.
+     */
+    @objc func getColorScheme(_ call: CAPPluginCall) {
+        var result = JSObject()
+        result["colorScheme"] = currentColorScheme
+        call.resolve(result)
     }
     
     // ============================================
@@ -277,6 +342,8 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         contentBg: String?,
         statusBarBg: String?,
         navigationBarBg: String?,
+        navigationBarLeftBg: String?,
+        navigationBarRightBg: String?,
         cutoutBg: String?
     ) {
         // Parse content background
@@ -298,9 +365,29 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             navigationBarBackgroundColor = contentBackgroundColor
         }
         
-        // Cutout: if not provided, use content background
+        // Navigation bar left (landscape): cascade from navigationBarBackgroundColor
+        if let bg = navigationBarLeftBg, let color = UIColor.fromHex(bg) {
+            navigationBarLeftBackgroundColor = color
+        } else if navigationBarLeftBackgroundColor == nil && navigationBarBackgroundColor != nil {
+            navigationBarLeftBackgroundColor = navigationBarBackgroundColor
+        } else if navigationBarLeftBackgroundColor == nil && contentBackgroundColor != nil {
+            navigationBarLeftBackgroundColor = contentBackgroundColor
+        }
+        
+        // Navigation bar right (landscape): cascade from navigationBarBackgroundColor
+        if let bg = navigationBarRightBg, let color = UIColor.fromHex(bg) {
+            navigationBarRightBackgroundColor = color
+        } else if navigationBarRightBackgroundColor == nil && navigationBarBackgroundColor != nil {
+            navigationBarRightBackgroundColor = navigationBarBackgroundColor
+        } else if navigationBarRightBackgroundColor == nil && contentBackgroundColor != nil {
+            navigationBarRightBackgroundColor = contentBackgroundColor
+        }
+        
+        // Cutout: if not provided, use status bar, then content background
         if let bg = cutoutBg, let color = UIColor.fromHex(bg) {
             cutoutBackgroundColor = color
+        } else if statusBarBackgroundColor != nil {
+            cutoutBackgroundColor = statusBarBackgroundColor
         } else {
             cutoutBackgroundColor = contentBackgroundColor
         }
@@ -346,13 +433,14 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
               let window = getKeyWindow() else { return }
         
         let safeAreaInsets = window.safeAreaInsets
+        let screenBounds = UIScreen.main.bounds
         
-        // Create status bar overlay
+        // Create status bar overlay (top)
         if safeAreaInsets.top > 0 {
             let statusBarFrame = CGRect(
                 x: 0,
                 y: 0,
-                width: UIScreen.main.bounds.width,
+                width: screenBounds.width,
                 height: safeAreaInsets.top
             )
             let overlay = UIView(frame: statusBarFrame)
@@ -367,8 +455,8 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         if safeAreaInsets.bottom > 0 {
             let bottomFrame = CGRect(
                 x: 0,
-                y: UIScreen.main.bounds.height - safeAreaInsets.bottom,
-                width: UIScreen.main.bounds.width,
+                y: screenBounds.height - safeAreaInsets.bottom,
+                width: screenBounds.width,
                 height: safeAreaInsets.bottom
             )
             let overlay = UIView(frame: bottomFrame)
@@ -378,6 +466,38 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             parentView.bringSubviewToFront(overlay)
             bottomOverlay = overlay
         }
+        
+        // Create left overlay for landscape
+        if safeAreaInsets.left > 0 {
+            let leftFrame = CGRect(
+                x: 0,
+                y: 0,
+                width: safeAreaInsets.left,
+                height: screenBounds.height
+            )
+            let overlay = UIView(frame: leftFrame)
+            overlay.backgroundColor = navigationBarLeftBackgroundColor ?? .clear
+            overlay.autoresizingMask = [.flexibleHeight, .flexibleRightMargin]
+            parentView.addSubview(overlay)
+            parentView.bringSubviewToFront(overlay)
+            leftOverlay = overlay
+        }
+        
+        // Create right overlay for landscape
+        if safeAreaInsets.right > 0 {
+            let rightFrame = CGRect(
+                x: screenBounds.width - safeAreaInsets.right,
+                y: 0,
+                width: safeAreaInsets.right,
+                height: screenBounds.height
+            )
+            let overlay = UIView(frame: rightFrame)
+            overlay.backgroundColor = navigationBarRightBackgroundColor ?? .clear
+            overlay.autoresizingMask = [.flexibleHeight, .flexibleLeftMargin]
+            parentView.addSubview(overlay)
+            parentView.bringSubviewToFront(overlay)
+            rightOverlay = overlay
+        }
     }
     
     private func removeOverlayViews() {
@@ -386,11 +506,44 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         
         bottomOverlay?.removeFromSuperview()
         bottomOverlay = nil
+        
+        leftOverlay?.removeFromSuperview()
+        leftOverlay = nil
+        
+        rightOverlay?.removeFromSuperview()
+        rightOverlay = nil
     }
     
     private func updateOverlayColors() {
         statusBarOverlay?.backgroundColor = statusBarBackgroundColor ?? .clear
         bottomOverlay?.backgroundColor = navigationBarBackgroundColor ?? .clear
+        leftOverlay?.backgroundColor = navigationBarLeftBackgroundColor ?? .clear
+        rightOverlay?.backgroundColor = navigationBarRightBackgroundColor ?? .clear
+    }
+    
+    // ============================================
+    // COLOR SCHEME (DARK MODE) HELPERS
+    // ============================================
+    
+    /**
+     * Get the current system color scheme.
+     */
+    private func getSystemColorScheme() -> String {
+        if #available(iOS 13.0, *) {
+            let style = UITraitCollection.current.userInterfaceStyle
+            return style == .dark ? "dark" : "light"
+        } else {
+            return "light"
+        }
+    }
+    
+    /**
+     * Notify JavaScript listeners of a color scheme change.
+     */
+    private func notifyColorSchemeChanged(_ colorScheme: String) {
+        var data = JSObject()
+        data["colorScheme"] = colorScheme
+        notifyListeners(EVENT_COLOR_SCHEME_CHANGED, data: data)
     }
 }
 
