@@ -16,7 +16,7 @@ import UIKit
  * The home indicator area is handled automatically by iOS.
  *
  * @author Payiano
- * @version 2.0.0
+ * @version 2.1.0
  */
 @objc(NativeThemePlugin)
 public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
@@ -46,7 +46,7 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     private var isEdgeToEdgeEnabled: Bool = false
     private var isSafeAreaEnabled: Bool = true
     private var isStatusBarVisible: Bool = true
-    private var isNavigationBarVisible: Bool = true // Always true on iOS (no equivalent)
+    private var isNavigationBarVisible: Bool = true
     private var currentColorScheme: String = "light"
     
     // ============================================
@@ -55,19 +55,20 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     
     private var contentBackgroundColor: UIColor?
     private var statusBarBackgroundColor: UIColor?
-    private var navigationBarBackgroundColor: UIColor? // Home indicator area on iOS
-    private var navigationBarLeftBackgroundColor: UIColor? // Left inset in landscape
-    private var navigationBarRightBackgroundColor: UIColor? // Right inset in landscape
-    private var cutoutBackgroundColor: UIColor? // Dynamic Island/Notch area
+    private var navigationBarBackgroundColor: UIColor?
+    private var navigationBarLeftBackgroundColor: UIColor?
+    private var navigationBarRightBackgroundColor: UIColor?
+    private var cutoutBackgroundColor: UIColor?
     
     // ============================================
-    // Overlay Views
+    // Container and Overlay Views
     // ============================================
     
+    private var containerView: UIView?
     private var statusBarOverlay: UIView?
-    private var bottomOverlay: UIView? // For home indicator area
-    private var leftOverlay: UIView? // For landscape left inset
-    private var rightOverlay: UIView? // For landscape right inset
+    private var bottomOverlay: UIView?
+    private var leftOverlay: UIView?
+    private var rightOverlay: UIView?
     
     // ============================================
     // Trait Collection Observer
@@ -82,17 +83,25 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     public override func load() {
         super.load()
         
-        // Initialize color scheme
-        currentColorScheme = getSystemColorScheme()
+        // Initialize color scheme from view controller's trait collection
+        DispatchQueue.main.async { [weak self] in
+            self?.initializeColorScheme()
+            self?.setupTraitObserver()
+        }
         
-        // Setup trait collection observer for dark mode changes
-        setupTraitObserver()
-        
-        // Listen for orientation changes to update overlays
+        // Listen for orientation changes
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleOrientationChange),
             name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
+        
+        // Also listen for app becoming active to re-check color scheme
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppBecameActive),
+            name: UIApplication.didBecomeActiveNotification,
             object: nil
         )
     }
@@ -102,35 +111,47 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         traitObserverView?.removeFromSuperview()
     }
     
-    private func setupTraitObserver() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self,
-                  let viewController = self.bridge?.viewController else { return }
-            
-            // Create and add the observer view
-            let observerView = TraitObserverView { [weak self] in
-                self?.checkColorSchemeChange()
-            }
-            observerView.frame = CGRect(x: 0, y: 0, width: 1, height: 1)
-            observerView.isHidden = true
-            viewController.view.addSubview(observerView)
-            self.traitObserverView = observerView
-        }
+    private func initializeColorScheme() {
+        currentColorScheme = getSystemColorScheme()
     }
     
-    private func checkColorSchemeChange() {
-        let newColorScheme = getSystemColorScheme()
-        if newColorScheme != currentColorScheme {
-            currentColorScheme = newColorScheme
-            notifyColorSchemeChanged(newColorScheme)
+    private func setupTraitObserver() {
+        guard let viewController = bridge?.viewController else { return }
+        
+        // Remove existing observer if any
+        traitObserverView?.removeFromSuperview()
+        
+        // Create observer view that properly detects trait changes
+        let observerView = TraitObserverView { [weak self] in
+            guard let self = self else { return }
+            let newScheme = self.getSystemColorScheme()
+            if newScheme != self.currentColorScheme {
+                self.currentColorScheme = newScheme
+                self.notifyColorSchemeChanged(newScheme)
+            }
+        }
+        
+        // The observer must be visible in the view hierarchy to receive trait changes
+        observerView.frame = CGRect(x: -1, y: -1, width: 1, height: 1)
+        observerView.backgroundColor = .clear
+        observerView.isUserInteractionEnabled = false
+        viewController.view.addSubview(observerView)
+        traitObserverView = observerView
+    }
+    
+    @objc private func handleAppBecameActive() {
+        // Re-check color scheme when app becomes active
+        let newScheme = getSystemColorScheme()
+        if newScheme != currentColorScheme {
+            currentColorScheme = newScheme
+            notifyColorSchemeChanged(newScheme)
         }
     }
     
     @objc private func handleOrientationChange() {
-        // Rebuild overlays when orientation changes to update sizes
         if isEdgeToEdgeEnabled {
-            DispatchQueue.main.async { [weak self] in
-                self?.setupOverlayViews()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.updateOverlayFrames()
             }
         }
     }
@@ -139,9 +160,6 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     // PUBLIC API METHODS
     // ============================================
     
-    /**
-     * Configure the entire system UI in a single call.
-     */
     @objc func configure(_ call: CAPPluginCall) {
         let edgeToEdge = call.getBool("edgeToEdge")
         let statusBarVisible = call.getBool("statusBarVisible")
@@ -191,9 +209,6 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
     
-    /**
-     * Set background colors for different UI areas.
-     */
     @objc func setBackgroundColors(_ call: CAPPluginCall) {
         let contentBg = call.getString("contentBackgroundColor")
         let statusBarBg = call.getString("statusBarBackgroundColor")
@@ -222,9 +237,6 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
     
-    /**
-     * Set the style (icon color) for system bars.
-     */
     @objc func setBarStyles(_ call: CAPPluginCall) {
         let statusBarStyle = call.getString("statusBarStyle")
         let navigationBarStyle = call.getString("navigationBarStyle")
@@ -240,9 +252,6 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
     
-    /**
-     * Show or hide the status bar.
-     */
     @objc func setStatusBarVisibility(_ call: CAPPluginCall) {
         let visible = call.getBool("visible") ?? true
         
@@ -258,19 +267,11 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
     
-    /**
-     * Show or hide the navigation bar.
-     * Note: On iOS, this has no effect as there's no dedicated navigation bar.
-     */
     @objc func setNavigationBarVisibility(_ call: CAPPluginCall) {
         // iOS doesn't have a navigation bar like Android
-        // The home indicator is always controlled by the system
         call.resolve()
     }
     
-    /**
-     * Enable or disable edge-to-edge mode.
-     */
     @objc func setEdgeToEdge(_ call: CAPPluginCall) {
         let enabled = call.getBool("enabled") ?? true
         
@@ -285,9 +286,6 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
     
-    /**
-     * Get current system UI state and inset values.
-     */
     @objc func getInfo(_ call: CAPPluginCall) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else {
@@ -306,7 +304,7 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             result["leftInset"] = Int(safeAreaInsets.left)
             result["rightInset"] = Int(safeAreaInsets.right)
             
-            // Cutout values (on iOS, top inset includes notch/dynamic island)
+            // Cutout values
             result["cutoutTop"] = Int(safeAreaInsets.top)
             result["cutoutLeft"] = Int(safeAreaInsets.left)
             result["cutoutRight"] = Int(safeAreaInsets.right)
@@ -317,20 +315,28 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             result["isStatusBarVisible"] = self.isStatusBarVisible
             result["isNavigationBarVisible"] = self.isNavigationBarVisible
             
-            // Color scheme
-            result["colorScheme"] = self.currentColorScheme
+            // Color scheme - get fresh value
+            result["colorScheme"] = self.getSystemColorScheme()
             
             call.resolve(result)
         }
     }
     
-    /**
-     * Get the current system color scheme.
-     */
     @objc func getColorScheme(_ call: CAPPluginCall) {
-        var result = JSObject()
-        result["colorScheme"] = currentColorScheme
-        call.resolve(result)
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else {
+                call.reject("Plugin instance not available")
+                return
+            }
+            
+            // Always get fresh color scheme from view controller
+            let colorScheme = self.getSystemColorScheme()
+            self.currentColorScheme = colorScheme
+            
+            var result = JSObject()
+            result["colorScheme"] = colorScheme
+            call.resolve(result)
+        }
     }
     
     // ============================================
@@ -351,10 +357,11 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     private func configureEdgeToEdge(enabled: Bool) {
         isEdgeToEdgeEnabled = enabled
         
-        guard let webView = bridge?.webView else { return }
+        guard let webView = bridge?.webView,
+              let viewController = bridge?.viewController else { return }
         
         if enabled {
-            // Enable edge-to-edge by disabling automatic content inset adjustment
+            // Disable automatic content inset adjustment
             webView.scrollView.contentInsetAdjustmentBehavior = .never
             
             // Make WebView transparent to show window background
@@ -362,11 +369,27 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             webView.backgroundColor = .clear
             webView.scrollView.backgroundColor = .clear
             
-            // Setup overlay views
+            // Disable bounce
+            webView.scrollView.bounces = false
+            webView.scrollView.alwaysBounceVertical = false
+            webView.scrollView.alwaysBounceHorizontal = false
+            
+            // Set the window/view controller background
+            if let color = contentBackgroundColor {
+                viewController.view.backgroundColor = color
+                getKeyWindow()?.backgroundColor = color
+            }
+            
+            // Setup overlay views for safe area coloring
             setupOverlayViews()
+            
+            // Make sure WebView fills the entire screen
+            webView.frame = viewController.view.bounds
+            webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         } else {
             // Restore normal behavior
             webView.scrollView.contentInsetAdjustmentBehavior = .automatic
+            webView.scrollView.bounces = true
             
             // Remove overlays
             removeOverlayViews()
@@ -381,7 +404,6 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         navigationBarRightBg: String?,
         cutoutBg: String?
     ) {
-        // Parse all colors first
         let parsedContentBg = contentBg.flatMap { UIColor.fromHex($0) }
         let parsedStatusBarBg = statusBarBg.flatMap { UIColor.fromHex($0) }
         let parsedNavBarBg = navigationBarBg.flatMap { UIColor.fromHex($0) }
@@ -401,7 +423,7 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             statusBarBackgroundColor = content
         }
         
-        // Navigation bar (bottom): use provided, or cascade from left/right -> content
+        // Navigation bar (bottom)
         if let color = parsedNavBarBg {
             navigationBarBackgroundColor = color
         } else if let left = parsedNavBarLeftBg {
@@ -412,7 +434,7 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             navigationBarBackgroundColor = content
         }
         
-        // Navigation bar left: use provided, or cascade from right -> navBar -> content
+        // Navigation bar left
         if let color = parsedNavBarLeftBg {
             navigationBarLeftBackgroundColor = color
         } else if let right = parsedNavBarRightBg {
@@ -423,7 +445,7 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             navigationBarLeftBackgroundColor = content
         }
         
-        // Navigation bar right: use provided, or cascade from left -> navBar -> content
+        // Navigation bar right
         if let color = parsedNavBarRightBg {
             navigationBarRightBackgroundColor = color
         } else if let left = parsedNavBarLeftBg {
@@ -447,9 +469,10 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     private func applyBackgroundColors() {
         guard let viewController = bridge?.viewController else { return }
         
-        // Set main content background
+        // Set main content background on both view controller and window
         if let color = contentBackgroundColor {
             viewController.view.backgroundColor = color
+            getKeyWindow()?.backgroundColor = color
             bridge?.webView?.backgroundColor = .clear
             bridge?.webView?.scrollView.backgroundColor = .clear
         }
@@ -460,13 +483,9 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     
     private func applyBarStyles(statusBarStyle: String?, navigationBarStyle: String?) {
         if let style = statusBarStyle {
-            // 'light' = dark icons (for light backgrounds)
-            // 'dark' = light icons (for dark backgrounds)
             let uiStyle: UIStatusBarStyle = style.lowercased() == "light" ? .darkContent : .lightContent
             bridge?.statusBarStyle = uiStyle
         }
-        
-        // navigationBarStyle is ignored on iOS as there's no equivalent
     }
     
     private func setStatusBarHidden(_ hidden: Bool) {
@@ -480,74 +499,61 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     private func setupOverlayViews() {
         removeOverlayViews()
         
-        guard let parentView = bridge?.webView?.superview,
+        guard let viewController = bridge?.viewController,
               let window = getKeyWindow() else { return }
         
+        let parentView = viewController.view!
         let safeAreaInsets = window.safeAreaInsets
-        let screenBounds = UIScreen.main.bounds
+        let bounds = parentView.bounds
         
-        // Create status bar overlay (top)
+        // Status bar overlay (top)
         if safeAreaInsets.top > 0 {
-            let statusBarFrame = CGRect(
-                x: 0,
-                y: 0,
-                width: screenBounds.width,
-                height: safeAreaInsets.top
-            )
-            let overlay = UIView(frame: statusBarFrame)
+            let overlay = UIView()
             overlay.backgroundColor = statusBarBackgroundColor ?? .clear
+            overlay.frame = CGRect(x: 0, y: 0, width: bounds.width, height: safeAreaInsets.top)
             overlay.autoresizingMask = [.flexibleWidth, .flexibleBottomMargin]
             parentView.addSubview(overlay)
-            parentView.bringSubviewToFront(overlay)
             statusBarOverlay = overlay
         }
         
-        // Create bottom overlay for home indicator area
+        // Bottom overlay (home indicator area)
         if safeAreaInsets.bottom > 0 {
-            let bottomFrame = CGRect(
-                x: 0,
-                y: screenBounds.height - safeAreaInsets.bottom,
-                width: screenBounds.width,
-                height: safeAreaInsets.bottom
-            )
-            let overlay = UIView(frame: bottomFrame)
+            let overlay = UIView()
             overlay.backgroundColor = navigationBarBackgroundColor ?? .clear
+            overlay.frame = CGRect(x: 0, y: bounds.height - safeAreaInsets.bottom, width: bounds.width, height: safeAreaInsets.bottom)
             overlay.autoresizingMask = [.flexibleWidth, .flexibleTopMargin]
             parentView.addSubview(overlay)
-            parentView.bringSubviewToFront(overlay)
             bottomOverlay = overlay
         }
         
-        // Create left overlay for landscape
+        // Left overlay (landscape)
         if safeAreaInsets.left > 0 {
-            let leftFrame = CGRect(
-                x: 0,
-                y: 0,
-                width: safeAreaInsets.left,
-                height: screenBounds.height
-            )
-            let overlay = UIView(frame: leftFrame)
+            let overlay = UIView()
             overlay.backgroundColor = navigationBarLeftBackgroundColor ?? .clear
+            overlay.frame = CGRect(x: 0, y: 0, width: safeAreaInsets.left, height: bounds.height)
             overlay.autoresizingMask = [.flexibleHeight, .flexibleRightMargin]
             parentView.addSubview(overlay)
-            parentView.bringSubviewToFront(overlay)
             leftOverlay = overlay
         }
         
-        // Create right overlay for landscape
+        // Right overlay (landscape)
         if safeAreaInsets.right > 0 {
-            let rightFrame = CGRect(
-                x: screenBounds.width - safeAreaInsets.right,
-                y: 0,
-                width: safeAreaInsets.right,
-                height: screenBounds.height
-            )
-            let overlay = UIView(frame: rightFrame)
+            let overlay = UIView()
             overlay.backgroundColor = navigationBarRightBackgroundColor ?? .clear
+            overlay.frame = CGRect(x: bounds.width - safeAreaInsets.right, y: 0, width: safeAreaInsets.right, height: bounds.height)
             overlay.autoresizingMask = [.flexibleHeight, .flexibleLeftMargin]
             parentView.addSubview(overlay)
-            parentView.bringSubviewToFront(overlay)
             rightOverlay = overlay
+        }
+        
+        // Bring WebView to front so overlays are behind it
+        if let webView = bridge?.webView {
+            parentView.bringSubviewToFront(webView)
+        }
+        
+        // Bring trait observer to front
+        if let observer = traitObserverView {
+            parentView.bringSubviewToFront(observer)
         }
     }
     
@@ -565,10 +571,80 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         rightOverlay = nil
     }
     
+    private func updateOverlayFrames() {
+        guard let window = getKeyWindow(),
+              let parentView = bridge?.viewController?.view else { return }
+        
+        let safeAreaInsets = window.safeAreaInsets
+        let bounds = parentView.bounds
+        
+        // Update or create overlays based on current safe area insets
+        if safeAreaInsets.top > 0 {
+            if statusBarOverlay == nil {
+                let overlay = UIView()
+                overlay.autoresizingMask = [.flexibleWidth, .flexibleBottomMargin]
+                parentView.addSubview(overlay)
+                statusBarOverlay = overlay
+            }
+            statusBarOverlay?.frame = CGRect(x: 0, y: 0, width: bounds.width, height: safeAreaInsets.top)
+        } else {
+            statusBarOverlay?.removeFromSuperview()
+            statusBarOverlay = nil
+        }
+        
+        if safeAreaInsets.bottom > 0 {
+            if bottomOverlay == nil {
+                let overlay = UIView()
+                overlay.autoresizingMask = [.flexibleWidth, .flexibleTopMargin]
+                parentView.addSubview(overlay)
+                bottomOverlay = overlay
+            }
+            bottomOverlay?.frame = CGRect(x: 0, y: bounds.height - safeAreaInsets.bottom, width: bounds.width, height: safeAreaInsets.bottom)
+        } else {
+            bottomOverlay?.removeFromSuperview()
+            bottomOverlay = nil
+        }
+        
+        if safeAreaInsets.left > 0 {
+            if leftOverlay == nil {
+                let overlay = UIView()
+                overlay.autoresizingMask = [.flexibleHeight, .flexibleRightMargin]
+                parentView.addSubview(overlay)
+                leftOverlay = overlay
+            }
+            leftOverlay?.frame = CGRect(x: 0, y: 0, width: safeAreaInsets.left, height: bounds.height)
+        } else {
+            leftOverlay?.removeFromSuperview()
+            leftOverlay = nil
+        }
+        
+        if safeAreaInsets.right > 0 {
+            if rightOverlay == nil {
+                let overlay = UIView()
+                overlay.autoresizingMask = [.flexibleHeight, .flexibleLeftMargin]
+                parentView.addSubview(overlay)
+                rightOverlay = overlay
+            }
+            rightOverlay?.frame = CGRect(x: bounds.width - safeAreaInsets.right, y: 0, width: safeAreaInsets.right, height: bounds.height)
+        } else {
+            rightOverlay?.removeFromSuperview()
+            rightOverlay = nil
+        }
+        
+        updateOverlayColors()
+        
+        // Ensure proper z-order
+        if let webView = bridge?.webView {
+            parentView.bringSubviewToFront(webView)
+        }
+        if let observer = traitObserverView {
+            parentView.bringSubviewToFront(observer)
+        }
+    }
+    
     private func updateOverlayColors() {
         let effectiveCutoutColor = cutoutBackgroundColor ?? contentBackgroundColor ?? .clear
         
-        // Get current safe area insets to check for cutouts
         let window = getKeyWindow()
         let safeAreaInsets = window?.safeAreaInsets ?? UIEdgeInsets.zero
         let hasLeftCutout = safeAreaInsets.left > 0
@@ -577,14 +653,12 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         statusBarOverlay?.backgroundColor = statusBarBackgroundColor ?? .clear
         bottomOverlay?.backgroundColor = navigationBarBackgroundColor ?? .clear
         
-        // Left bar: use cutout color if there's a cutout, otherwise use the left-specific color
         if hasLeftCutout {
             leftOverlay?.backgroundColor = effectiveCutoutColor
         } else {
             leftOverlay?.backgroundColor = navigationBarLeftBackgroundColor ?? navigationBarBackgroundColor ?? .clear
         }
         
-        // Right bar: use cutout color if there's a cutout, otherwise use the right-specific color
         if hasRightCutout {
             rightOverlay?.backgroundColor = effectiveCutoutColor
         } else {
@@ -597,20 +671,25 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     // ============================================
     
     /**
-     * Get the current system color scheme.
+     * Get the current system color scheme from the view controller's trait collection.
+     * This is the reliable way to get the current color scheme.
      */
     private func getSystemColorScheme() -> String {
-        if #available(iOS 13.0, *) {
-            let style = UITraitCollection.current.userInterfaceStyle
+        // Must use the view controller's trait collection, not UITraitCollection.current
+        if let viewController = bridge?.viewController {
+            let style = viewController.traitCollection.userInterfaceStyle
             return style == .dark ? "dark" : "light"
-        } else {
-            return "light"
         }
+        
+        // Fallback to window
+        if let window = getKeyWindow() {
+            let style = window.traitCollection.userInterfaceStyle
+            return style == .dark ? "dark" : "light"
+        }
+        
+        return "light"
     }
     
-    /**
-     * Notify JavaScript listeners of a color scheme change.
-     */
     private func notifyColorSchemeChanged(_ colorScheme: String) {
         var data = JSObject()
         data["colorScheme"] = colorScheme
@@ -623,7 +702,7 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
 // ============================================
 
 /**
- * A hidden UIView that observes trait collection changes.
+ * A UIView that observes trait collection changes.
  * This is the reliable way to detect dark mode changes in iOS.
  */
 private class TraitObserverView: UIView {
@@ -640,8 +719,10 @@ private class TraitObserverView: UIView {
     
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
-        if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
-            onTraitChange?()
+        if #available(iOS 13.0, *) {
+            if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+                onTraitChange?()
+            }
         }
     }
 }
@@ -651,10 +732,6 @@ private class TraitObserverView: UIView {
 // ============================================
 
 extension UIColor {
-    /**
-     * Creates a UIColor from a hex string.
-     * Supports formats: #RGB, #RRGGBB, #RRGGBBAA
-     */
     static func fromHex(_ hex: String) -> UIColor? {
         var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
