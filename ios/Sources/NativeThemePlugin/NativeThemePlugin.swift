@@ -66,6 +66,15 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     private var hasSetupContainer: Bool = false
     
     // ============================================
+    // Overlay Views for Safe Area Margins
+    // ============================================
+    
+    private var statusBarOverlay: UIView?
+    private var bottomOverlay: UIView?
+    private var leftOverlay: UIView?
+    private var rightOverlay: UIView?
+    
+    // ============================================
     // Trait Collection Observer
     // ============================================
     
@@ -118,6 +127,7 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     deinit {
         NotificationCenter.default.removeObserver(self)
         traitObserverView?.removeFromSuperview()
+        removeOverlayViews()
     }
     
     private func initializeColorScheme() {
@@ -369,7 +379,7 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
      * Configure edge-to-edge mode using container approach (like AppViewController)
      * - Container fills entire screen with background color
      * - WebView is placed INSIDE the safe area
-     * - Container background shows through in safe area margins
+     * - Overlay views in safe area margins for individual bar colors
      */
     private func configureEdgeToEdge(enabled: Bool) {
         isEdgeToEdgeEnabled = enabled
@@ -379,6 +389,7 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         
         if enabled {
             setupContainerView()
+            setupOverlayViews()
             
             // Configure WebView
             webView.scrollView.contentInsetAdjustmentBehavior = .never
@@ -391,6 +402,7 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             
             // Update frame to fit inside safe area
             updateWebViewFrame()
+            updateOverlayFrames()
             
         } else {
             // Restore normal behavior
@@ -403,6 +415,7 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             
             // Restore container/webview hierarchy
             restoreOriginalHierarchy()
+            removeOverlayViews()
         }
     }
     
@@ -453,6 +466,115 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     }
     
     /**
+     * Setup overlay views for safe area margins
+     * These overlays allow individual colors for status bar, bottom bar, and side areas
+     */
+    private func setupOverlayViews() {
+        guard let viewController = bridge?.viewController else { return }
+        
+        let parentView = containerView ?? viewController.view!
+        
+        // Create overlays if they don't exist
+        if statusBarOverlay == nil {
+            let overlay = UIView()
+            overlay.backgroundColor = .clear
+            parentView.addSubview(overlay)
+            statusBarOverlay = overlay
+        }
+        
+        if bottomOverlay == nil {
+            let overlay = UIView()
+            overlay.backgroundColor = .clear
+            parentView.addSubview(overlay)
+            bottomOverlay = overlay
+        }
+        
+        if leftOverlay == nil {
+            let overlay = UIView()
+            overlay.backgroundColor = .clear
+            parentView.addSubview(overlay)
+            leftOverlay = overlay
+        }
+        
+        if rightOverlay == nil {
+            let overlay = UIView()
+            overlay.backgroundColor = .clear
+            parentView.addSubview(overlay)
+            rightOverlay = overlay
+        }
+        
+        // Make sure WebView is on top of overlays
+        if let webView = bridge?.webView {
+            parentView.bringSubviewToFront(webView)
+        }
+        
+        // Re-add trait observer on top
+        if let observer = traitObserverView {
+            parentView.bringSubviewToFront(observer)
+        }
+    }
+    
+    /**
+     * Remove overlay views when disabling edge-to-edge
+     */
+    private func removeOverlayViews() {
+        statusBarOverlay?.removeFromSuperview()
+        statusBarOverlay = nil
+        
+        bottomOverlay?.removeFromSuperview()
+        bottomOverlay = nil
+        
+        leftOverlay?.removeFromSuperview()
+        leftOverlay = nil
+        
+        rightOverlay?.removeFromSuperview()
+        rightOverlay = nil
+    }
+    
+    /**
+     * Update overlay frames to match safe area insets
+     */
+    private func updateOverlayFrames() {
+        guard isEdgeToEdgeEnabled,
+              let viewController = bridge?.viewController else { return }
+        
+        let bounds = viewController.view.bounds
+        let safeArea = viewController.view.safeAreaInsets
+        
+        // Status bar overlay: top edge to safe area top
+        statusBarOverlay?.frame = CGRect(
+            x: 0,
+            y: 0,
+            width: bounds.width,
+            height: safeArea.top
+        )
+        
+        // Bottom overlay: safe area bottom to screen bottom
+        bottomOverlay?.frame = CGRect(
+            x: 0,
+            y: bounds.height - safeArea.bottom,
+            width: bounds.width,
+            height: safeArea.bottom
+        )
+        
+        // Left overlay: left edge to safe area left (full height minus top/bottom)
+        leftOverlay?.frame = CGRect(
+            x: 0,
+            y: safeArea.top,
+            width: safeArea.left,
+            height: bounds.height - safeArea.top - safeArea.bottom
+        )
+        
+        // Right overlay: safe area right to screen right (full height minus top/bottom)
+        rightOverlay?.frame = CGRect(
+            x: bounds.width - safeArea.right,
+            y: safeArea.top,
+            width: safeArea.right,
+            height: bounds.height - safeArea.top - safeArea.bottom
+        )
+    }
+    
+    /**
      * Update WebView frame to fit inside safe area
      * This is called on orientation changes and keyboard events
      */
@@ -468,6 +590,9 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         if webView.frame != safeFrame {
             webView.frame = safeFrame
         }
+        
+        // Also update overlay frames
+        updateOverlayFrames()
     }
     
     private func parseAndStoreColors(
@@ -535,13 +660,14 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     }
     
     /**
-     * Apply background colors to container and window
-     * The container background shows through in safe area margins
+     * Apply background colors to container and overlay views
+     * - Container/window gets contentBackgroundColor (fallback)
+     * - Individual overlays get their specific colors
      */
     private func applyBackgroundColors() {
         guard let viewController = bridge?.viewController else { return }
         
-        // Set container/view background - this shows in safe area margins
+        // Set container/view background - fallback for any uncovered areas
         if let color = contentBackgroundColor {
             viewController.view.backgroundColor = color
             containerView?.backgroundColor = color
@@ -550,6 +676,21 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
             // Keep WebView transparent so container shows through
             bridge?.webView?.backgroundColor = .clear
             bridge?.webView?.scrollView.backgroundColor = .clear
+        }
+        
+        // Apply individual overlay colors
+        if isEdgeToEdgeEnabled {
+            // Status bar area: use statusBarBackgroundColor, fallback to cutoutBackgroundColor, then contentBackgroundColor
+            statusBarOverlay?.backgroundColor = statusBarBackgroundColor ?? cutoutBackgroundColor ?? contentBackgroundColor
+            
+            // Bottom area (home indicator): use navigationBarBackgroundColor, fallback to contentBackgroundColor
+            bottomOverlay?.backgroundColor = navigationBarBackgroundColor ?? contentBackgroundColor
+            
+            // Left side (landscape): use navigationBarLeftBackgroundColor, fallback to cutoutBackgroundColor, then contentBackgroundColor
+            leftOverlay?.backgroundColor = navigationBarLeftBackgroundColor ?? cutoutBackgroundColor ?? contentBackgroundColor
+            
+            // Right side (landscape): use navigationBarRightBackgroundColor, fallback to cutoutBackgroundColor, then contentBackgroundColor
+            rightOverlay?.backgroundColor = navigationBarRightBackgroundColor ?? cutoutBackgroundColor ?? contentBackgroundColor
         }
     }
     
