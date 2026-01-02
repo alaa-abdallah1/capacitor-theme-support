@@ -1,6 +1,6 @@
 {
   "name": "capacitor-theme-support",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A comprehensive Capacitor plugin for native system UI control - edge-to-edge display, status bar, navigation bar, dark mode detection for Android and iOS.",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
