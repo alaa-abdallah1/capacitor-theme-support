@@ -11,7 +11,8 @@
  * - Landscape orientation support with separate controls
  * - Display cutout (notch/Dynamic Island) handling
  *
- * @module capacitor-native-ui
+ * @module capacitor-theme-support
+ * @version 1.0.0
  */
 
 import type { PluginListenerHandle } from '@capacitor/core';
@@ -27,7 +28,7 @@ import type { PluginListenerHandle } from '@capacitor/core';
  *
  * @example
  * ```typescript
- * import { SystemUI, BarStyle } from 'capacitor-native-ui';
+ * import { SystemUI, BarStyle } from 'capacitor-theme-support';
  *
  * await SystemUI.configure({
  *   statusBarStyle: BarStyle.Light,
@@ -56,7 +57,7 @@ export enum BarStyle {
  *
  * @example
  * ```typescript
- * import { SystemUI, ColorScheme } from 'capacitor-native-ui';
+ * import { SystemUI, ColorScheme } from 'capacitor-theme-support';
  *
  * const { colorScheme } = await SystemUI.getColorScheme();
  * if (colorScheme === ColorScheme.Dark) {
@@ -438,7 +439,7 @@ export interface SystemUIInfo {
  *
  * @example
  * ```typescript
- * import { SystemUI, BarStyle, ColorScheme } from 'capacitor-native-ui';
+ * import { SystemUI, BarStyle, ColorScheme } from 'capacitor-theme-support';
  *
  * // Configure everything at once
  * await SystemUI.configure({

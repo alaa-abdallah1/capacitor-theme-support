@@ -13,7 +13,7 @@ import type { SystemUIPlugin } from './definitions';
  *
  * @example
  * ```typescript
- * import { SystemUI, BarStyle, ColorScheme } from 'capacitor-native-ui';
+ * import { SystemUI, BarStyle, ColorScheme } from 'capacitor-theme-support';
  *
  * // Configure everything at once
  * await SystemUI.configure({

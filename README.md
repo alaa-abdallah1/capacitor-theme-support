@@ -1,535 +1,202 @@
-# 🎨 @payiano/capacitor-theme-support
+# 🎨 capacitor-theme-support
 
-[![GitHub release](https://img.shields.io/github/v/release/alaa-abdallah1/capacitor-theme.svg)](https://github.com/alaa-abdallah1/capacitor-theme/releases)
+> Make your Capacitor app look **truly native** with beautiful edge-to-edge displays and seamless dark mode support.
+
+[![NPM Version](https://img.shields.io/npm/v/capacitor-theme-support?color=red)](https://www.npmjs.com/package/capacitor-theme-support)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
-[![NPM Package](https://img.shields.io/npm/v/@payiano/capacitor-theme-support?color=red)](https://www.npmjs.com/package/@payiano/capacitor-theme-support)
-[![NPM downloads](https://img.shields.io/npm/dw/@payiano/capacitor-theme-support?color=limegreen)](https://www.npmjs.com/package/@payiano/capacitor-theme-support)
 
-> **Powered by [Payiano Team](https://payiano.com) | [GitHub](https://github.com/payiano)**
+---
 
-A comprehensive **Capacitor plugin** for **native system UI control** on Android and iOS. Take full control of your app's appearance with edge-to-edge display, custom system bar colors, and seamless dark mode support! 🚀
+## 🚀 What Does This Plugin Do?
 
-⚡ This plugin solves the **common theming challenges** in hybrid mobile apps by providing direct native control over system UI elements that CSS alone cannot touch.
+Ever noticed how your hybrid app looks different from native apps? The status bar has that awkward white or black bar? The navigation area doesn't match your app's colors? **This plugin fixes all of that.**
 
-⚡ With **consistent behavior across Android and iOS**, you can create truly immersive experiences with content extending behind status bars and navigation bars.
+| Before                                    | After                              |
+| ----------------------------------------- | ---------------------------------- |
+| ❌ Status bar doesn't blend with your app | ✅ Seamless full-screen experience |
+| ❌ Navigation bar is a different color    | ✅ Matching colors everywhere      |
+| ❌ Notch/Dynamic Island shows wrong color | ✅ Perfect cutout handling         |
+| ❌ Dark mode doesn't sync with system     | ✅ Automatic theme detection       |
 
-⚡ The **smart color cascade system** lets you set one color and have it apply everywhere, or customize each area independently for complete creative freedom.
+---
 
-## ✨ Features
-
-| Feature                       | Description                                                                  |
-| ----------------------------- | ---------------------------------------------------------------------------- |
-| 📱 **Edge-to-Edge Display**   | Content extends behind system bars for immersive full-screen experiences     |
-| 🎨 **Background Colors**      | Independent control of content, status bar, navigation bar, and cutout areas |
-| 👁️ **Visibility Control**     | Show/hide status bar and navigation bar programmatically                     |
-| 🌗 **Bar Styles**             | Light/dark icon themes that adapt to your app's color scheme                 |
-| 📐 **Inset Information**      | Get precise measurements for safe area handling                              |
-| 🔄 **Orientation Support**    | Automatic handling of landscape mode and device rotation                     |
-| 🌙 **Dark Mode Detection**    | Listen for system color scheme changes in real-time                          |
-| 🔲 **Display Cutout Support** | Handle notches, Dynamic Island, and camera cutouts gracefully                |
-
-## 🎯 Why This Plugin?
-
-Hybrid apps built with Capacitor often struggle with:
-
-- ❌ Status bar appearing as a solid block instead of blending with your app
-- ❌ Navigation bar not matching your app's theme
-- ❌ Inconsistent behavior between Android and iOS
-- ❌ Display cutouts (notch/Dynamic Island) showing wrong colors
-- ❌ Difficulty implementing true edge-to-edge layouts
-
-**This plugin solves all of these!** ✅
-
-## 📦 Compatibility
-
-| Platform       | Version                            |
-| -------------- | ---------------------------------- |
-| **Capacitor**  | 6.x, 7.x                           |
-| **Android**    | API 21+ (Android 5.0+)             |
-| **iOS**        | iOS 13+                            |
-| **TypeScript** | Full support with type definitions |
-
-## 🚀 Installation
-
-Install the plugin from [npm](https://www.npmjs.com/package/@payiano/capacitor-theme-support) with your preferred package manager:
+## 📦 Installation
 
 ```bash
-# NPM
-npm install @payiano/capacitor-theme-support
-
-# Yarn
-yarn add @payiano/capacitor-theme-support
-
-# PNPM
-pnpm add @payiano/capacitor-theme-support
-```
-
-Then sync your Capacitor project:
-
-```bash
+npm install capacitor-theme-support
 npx cap sync
 ```
 
-[![NPM](https://nodei.co/npm/@payiano/capacitor-theme-support.png)](https://www.npmjs.com/package/@payiano/capacitor-theme-support)
+---
 
-## 📖 Quick Start
+## 🎯 Quick Start
+
+**Just one line of code to make your app look amazing:**
 
 ```typescript
-import { SystemUI } from '@payiano/capacitor-theme-support';
+import { SystemUI } from 'capacitor-theme-support';
 
-// Configure everything in one call
+// Dark theme example
 await SystemUI.configure({
   edgeToEdge: true,
-  statusBarStyle: 'light',
+  statusBarStyle: 'light', // Light icons for dark backgrounds
   navigationBarStyle: 'light',
   contentBackgroundColor: '#1a1a2e',
-  statusBarBackgroundColor: '#16213e',
-  navigationBarBackgroundColor: '#0f3460',
 });
 ```
 
-That's it! Your app now has a beautiful, consistent theme across both platforms. 🎉
-
----
-
-## 📚 API Reference
-
-### `configure(options)`
-
-Configure the entire system UI in a single call. This is the **recommended method** as it applies all changes atomically, reducing visual glitches.
+**Light theme? Just as easy:**
 
 ```typescript
 await SystemUI.configure({
-  // Edge-to-edge mode
   edgeToEdge: true,
-
-  // Visibility
-  statusBarVisible: true,
-  navigationBarVisible: true,
-
-  // Icon styles ('light' for dark backgrounds, 'dark' for light backgrounds)
-  statusBarStyle: 'light',
-  navigationBarStyle: 'light',
-
-  // Background colors (hex format: #RRGGBB or #RRGGBBAA)
-  contentBackgroundColor: '#121212',
-  statusBarBackgroundColor: '#121212',
-  navigationBarBackgroundColor: '#121212',
-  cutoutBackgroundColor: '#121212',
-});
-```
-
-#### Options
-
-| Property                            | Type                | Description                                 |
-| ----------------------------------- | ------------------- | ------------------------------------------- |
-| `edgeToEdge`                        | `boolean`           | Enable edge-to-edge display mode            |
-| `statusBarVisible`                  | `boolean`           | Show/hide the status bar                    |
-| `navigationBarVisible`              | `boolean`           | Show/hide the navigation bar (Android only) |
-| `statusBarStyle`                    | `'light' \| 'dark'` | Status bar icon color                       |
-| `navigationBarStyle`                | `'light' \| 'dark'` | Navigation bar icon color (Android only)    |
-| `contentBackgroundColor`            | `string`            | Main content area background                |
-| `statusBarBackgroundColor`          | `string`            | Status bar area background                  |
-| `navigationBarBackgroundColor`      | `string`            | Navigation bar area background              |
-| `navigationBarLeftBackgroundColor`  | `string`            | Left navigation bar in landscape            |
-| `navigationBarRightBackgroundColor` | `string`            | Right navigation bar in landscape           |
-| `cutoutBackgroundColor`             | `string`            | Display cutout (notch/Dynamic Island) area  |
-
----
-
-### `setBackgroundColors(options)`
-
-Set background colors for different UI areas independently.
-
-```typescript
-// Set all areas to one color (cascade)
-await SystemUI.setBackgroundColors({
-  contentBackgroundColor: '#ffffff',
-});
-
-// Or customize each area
-await SystemUI.setBackgroundColors({
-  contentBackgroundColor: '#ffffff',
-  statusBarBackgroundColor: '#f5f5f5',
-  navigationBarBackgroundColor: '#e0e0e0',
-  cutoutBackgroundColor: '#f5f5f5',
-});
-```
-
-#### 🔄 Color Cascade Behavior
-
-Colors automatically cascade if not explicitly set:
-
-```
-contentBackgroundColor
-    ├── statusBarBackgroundColor
-    ├── navigationBarBackgroundColor
-    │       ├── navigationBarLeftBackgroundColor
-    │       └── navigationBarRightBackgroundColor
-    └── cutoutBackgroundColor (via statusBar)
-```
-
-- If only `contentBackgroundColor` is provided, it fills **all** areas
-- If `statusBarBackgroundColor` is not set, it uses `contentBackgroundColor`
-- If `navigationBarBackgroundColor` is not set, it uses `contentBackgroundColor`
-- If `cutoutBackgroundColor` is not set, it cascades from `statusBarBackgroundColor`
-
----
-
-### `setBarStyles(options)`
-
-Set the icon/content style for system bars.
-
-```typescript
-// For dark theme (light icons on dark background)
-await SystemUI.setBarStyles({
-  statusBarStyle: 'light',
-  navigationBarStyle: 'light',
-});
-
-// For light theme (dark icons on light background)
-await SystemUI.setBarStyles({
-  statusBarStyle: 'dark',
+  statusBarStyle: 'dark', // Dark icons for light backgrounds
   navigationBarStyle: 'dark',
+  contentBackgroundColor: '#ffffff',
 });
 ```
 
 ---
 
-### `setStatusBarVisibility(options)`
+## 🌗 Auto Dark Mode
 
-Show or hide the status bar.
-
-```typescript
-// Hide status bar
-await SystemUI.setStatusBarVisibility({ visible: false });
-
-// Show status bar
-await SystemUI.setStatusBarVisibility({ visible: true });
-```
-
----
-
-### `setNavigationBarVisibility(options)`
-
-Show or hide the navigation bar (Android only).
+Want your app to automatically follow the system's dark/light mode?
 
 ```typescript
-// Hide navigation bar (immersive mode)
-await SystemUI.setNavigationBarVisibility({ visible: false });
+import { SystemUI } from 'capacitor-theme-support';
 
-// Show navigation bar
-await SystemUI.setNavigationBarVisibility({ visible: true });
-```
-
-> **Note**: On iOS, this method has no effect as the home indicator is controlled by the system.
-
----
-
-### `setEdgeToEdge(options)`
-
-Enable or disable edge-to-edge display mode.
-
-```typescript
-// Enable edge-to-edge
-await SystemUI.setEdgeToEdge({ enabled: true });
-
-// Disable edge-to-edge (restore normal behavior)
-await SystemUI.setEdgeToEdge({ enabled: false });
-```
-
----
-
-### `getInfo()`
-
-Get current system UI information including inset values.
-
-```typescript
-const info = await SystemUI.getInfo();
-
-console.log('Status bar height:', info.statusBarHeight);
-console.log('Navigation bar height:', info.navigationBarHeight);
-console.log('Left inset:', info.leftInset);
-console.log('Right inset:', info.rightInset);
-console.log('Is edge-to-edge:', info.isEdgeToEdgeEnabled);
-console.log('Color scheme:', info.colorScheme);
-```
-
-#### Return Value (`SystemUIInfo`)
-
-| Property                 | Type                | Description                        |
-| ------------------------ | ------------------- | ---------------------------------- |
-| `statusBarHeight`        | `number`            | Status bar height in pixels        |
-| `navigationBarHeight`    | `number`            | Navigation bar height in pixels    |
-| `leftInset`              | `number`            | Left inset (landscape navigation)  |
-| `rightInset`             | `number`            | Right inset (landscape navigation) |
-| `cutoutTop`              | `number`            | Top display cutout height          |
-| `cutoutLeft`             | `number`            | Left display cutout width          |
-| `cutoutRight`            | `number`            | Right display cutout width         |
-| `isEdgeToEdgeEnabled`    | `boolean`           | Whether edge-to-edge is active     |
-| `isSafeAreaEnabled`      | `boolean`           | Whether safe area is respected     |
-| `isStatusBarVisible`     | `boolean`           | Status bar visibility state        |
-| `isNavigationBarVisible` | `boolean`           | Navigation bar visibility state    |
-| `colorScheme`            | `'light' \| 'dark'` | Current system color scheme        |
-
----
-
-### `getColorScheme()`
-
-Get the current system color scheme.
-
-```typescript
-const { colorScheme } = await SystemUI.getColorScheme();
-console.log('Current theme:', colorScheme); // 'light' or 'dark'
-```
-
----
-
-### Event: `colorSchemeChanged`
-
-Listen for system color scheme changes (dark mode toggle).
-
-```typescript
-import { SystemUI } from '@payiano/capacitor-theme-support';
-
+// Listen for system theme changes
 SystemUI.addListener('colorSchemeChanged', event => {
-  console.log('Theme changed to:', event.colorScheme);
-
-  // Update your app's theme
   if (event.colorScheme === 'dark') {
-    applyDarkTheme();
+    // Apply your dark theme colors
+    SystemUI.configure({
+      edgeToEdge: true,
+      statusBarStyle: 'light',
+      contentBackgroundColor: '#121212',
+    });
   } else {
-    applyLightTheme();
+    // Apply your light theme colors
+    SystemUI.configure({
+      edgeToEdge: true,
+      statusBarStyle: 'dark',
+      contentBackgroundColor: '#ffffff',
+    });
   }
 });
 ```
 
 ---
 
-## 💡 Usage Examples
+## 🎨 Custom Colors for Each Area
 
-### Basic Light Theme
-
-```typescript
-await SystemUI.configure({
-  edgeToEdge: true,
-  statusBarStyle: 'dark',
-  navigationBarStyle: 'dark',
-  contentBackgroundColor: '#ffffff',
-});
-```
-
-### Basic Dark Theme
+Want different colors for the status bar, navigation bar, and content? No problem:
 
 ```typescript
 await SystemUI.configure({
   edgeToEdge: true,
   statusBarStyle: 'light',
-  navigationBarStyle: 'light',
-  contentBackgroundColor: '#121212',
+  contentBackgroundColor: '#1a1a2e', // Your app's main background
+  statusBarBackgroundColor: '#16213e', // Top bar (where time/battery shows)
+  navigationBarBackgroundColor: '#0f3460', // Bottom bar (where home button is)
+  cutoutBackgroundColor: '#000000', // Notch/Dynamic Island area
 });
 ```
 
-### Dynamic Theme Switching (Vue/Nuxt)
+---
 
-```typescript
-import { SystemUI } from '@payiano/capacitor-theme-support';
+## 📱 What You Can Control
 
-const isDarkMode = ref(false);
+| Feature                  | What It Does                              |
+| ------------------------ | ----------------------------------------- |
+| **Edge-to-Edge**         | Make your app fill the entire screen      |
+| **Status Bar Color**     | Color behind the clock, battery, signal   |
+| **Navigation Bar Color** | Color behind the home button/gesture area |
+| **Cutout Color**         | Color behind the notch or Dynamic Island  |
+| **Bar Styles**           | Light or dark icons in system bars        |
+| **Dark Mode Detection**  | Know when user switches dark/light mode   |
+| **Bar Visibility**       | Show or hide status/navigation bars       |
 
-watch(
-  isDarkMode,
-  dark => {
-    SystemUI.configure({
-      edgeToEdge: true,
-      statusBarStyle: dark ? 'light' : 'dark',
-      navigationBarStyle: dark ? 'light' : 'dark',
-      contentBackgroundColor: dark ? '#121212' : '#ffffff',
-      statusBarBackgroundColor: dark ? '#1e1e1e' : '#f5f5f5',
-      navigationBarBackgroundColor: dark ? '#1e1e1e' : '#f5f5f5',
-    });
-  },
-  { immediate: true },
-);
-```
+---
 
-### Fullscreen Media Player
-
-```typescript
-// Enter fullscreen
-await SystemUI.configure({
-  edgeToEdge: true,
-  statusBarVisible: false,
-  navigationBarVisible: false,
-  contentBackgroundColor: '#000000',
-});
-
-// Exit fullscreen
-await SystemUI.configure({
-  statusBarVisible: true,
-  navigationBarVisible: true,
-});
-```
-
-### Gradient Header Effect
+## 🔧 All Available Options
 
 ```typescript
 await SystemUI.configure({
-  edgeToEdge: true,
-  statusBarStyle: 'light',
+  // Display mode
+  edgeToEdge: true, // Fill entire screen
+
+  // Visibility
+  statusBarVisible: true, // Show/hide status bar
+  navigationBarVisible: true, // Show/hide nav bar (Android only)
+
+  // Icon colors
+  statusBarStyle: 'light', // 'light' = white icons, 'dark' = black icons
+  navigationBarStyle: 'light', // Same as above (Android only)
+
+  // Background colors (use hex: '#RRGGBB' or '#RRGGBBAA')
   contentBackgroundColor: '#1a1a2e',
-  statusBarBackgroundColor: '#0d0d1a', // Darker shade for header
-  navigationBarBackgroundColor: '#1a1a2e',
+  statusBarBackgroundColor: '#16213e',
+  navigationBarBackgroundColor: '#0f3460',
+  cutoutBackgroundColor: '#000000',
+
+  // Landscape mode (optional)
+  navigationBarLeftBackgroundColor: '#0f3460',
+  navigationBarRightBackgroundColor: '#0f3460',
 });
 ```
 
-### Safe Area CSS Variables
+---
+
+## 📊 Get System Information
+
+Need to know the exact sizes for your layouts?
 
 ```typescript
 const info = await SystemUI.getInfo();
 
-// Use in CSS custom properties
-document.documentElement.style.setProperty(
-  '--safe-area-top',
-  `${info.statusBarHeight}px`,
-);
-document.documentElement.style.setProperty(
-  '--safe-area-bottom',
-  `${info.navigationBarHeight}px`,
-);
-document.documentElement.style.setProperty(
-  '--safe-area-left',
-  `${info.leftInset}px`,
-);
-document.documentElement.style.setProperty(
-  '--safe-area-right',
-  `${info.rightInset}px`,
-);
-```
-
-### Auto Dark Mode with System Detection
-
-```typescript
-import { SystemUI } from '@payiano/capacitor-theme-support';
-
-// Initial setup based on system preference
-const { colorScheme } = await SystemUI.getColorScheme();
-applyTheme(colorScheme);
-
-// Listen for changes
-SystemUI.addListener('colorSchemeChanged', event => {
-  applyTheme(event.colorScheme);
-});
-
-function applyTheme(scheme: 'light' | 'dark') {
-  const isDark = scheme === 'dark';
-
-  SystemUI.configure({
-    edgeToEdge: true,
-    statusBarStyle: isDark ? 'light' : 'dark',
-    navigationBarStyle: isDark ? 'light' : 'dark',
-    contentBackgroundColor: isDark ? '#121212' : '#ffffff',
-  });
-}
+console.log(info.statusBarHeight); // Height in pixels
+console.log(info.navigationBarHeight); // Height in pixels
+console.log(info.colorScheme); // 'light' or 'dark'
+console.log(info.isEdgeToEdgeEnabled); // true or false
 ```
 
 ---
 
-## 📱 Platform Differences
+## ✅ Supported Platforms
 
-| Feature                   | Android                   | iOS                     |
-| ------------------------- | ------------------------- | ----------------------- |
-| Status bar colors         | ✅ Full support           | ✅ Full support         |
-| Navigation bar colors     | ✅ Full support           | ✅ Home indicator area  |
-| Status bar visibility     | ✅ Full support           | ✅ Full support         |
-| Navigation bar visibility | ✅ Hide with swipe reveal | ❌ No effect            |
-| Display cutout handling   | ✅ Full support           | ✅ Notch/Dynamic Island |
-| Edge-to-edge              | ✅ Full support           | ✅ Full support         |
-| Dark mode detection       | ✅ Full support           | ✅ Full support         |
-| Landscape bar colors      | ✅ Left/Right control     | ✅ Left/Right control   |
+| Platform      | Support                   |
+| ------------- | ------------------------- |
+| **Android**   | ✅ Full support (API 22+) |
+| **iOS**       | ✅ Full support (iOS 13+) |
+| **Capacitor** | 6.x, 7.x, 8.x             |
 
 ---
 
-## 🔄 Migration from v1.x
+## 💡 Tips
 
-If you're upgrading from the old `NativeTheme` API:
-
-### Old API (v1.x)
-
-```typescript
-import { NativeTheme } from '@payiano/capacitor-theme';
-
-await NativeTheme.enableEdgeToEdge();
-await NativeTheme.setAppTheme({
-  windowBackgroundColor: '#ffffff',
-  statusBarColor: '#ffffff',
-  navigationBarColor: '#ffffff',
-  isStatusBarLight: true,
-  isNavigationBarLight: true,
-});
-```
-
-### New API (v2.x)
-
-```typescript
-import { SystemUI } from '@payiano/capacitor-theme-support';
-
-await SystemUI.configure({
-  edgeToEdge: true,
-  statusBarStyle: 'dark',
-  navigationBarStyle: 'dark',
-  contentBackgroundColor: '#ffffff',
-  statusBarBackgroundColor: '#ffffff',
-  navigationBarBackgroundColor: '#ffffff',
-});
-```
-
-### Key Changes
-
-| v1.x                      | v2.x                              |
-| ------------------------- | --------------------------------- |
-| `NativeTheme`             | `SystemUI`                        |
-| `enableEdgeToEdge()`      | `configure({ edgeToEdge: true })` |
-| `setAppTheme()`           | `configure()`                     |
-| `windowBackgroundColor`   | `contentBackgroundColor`          |
-| `statusBarColor`          | `statusBarBackgroundColor`        |
-| `navigationBarColor`      | `navigationBarBackgroundColor`    |
-| `isStatusBarLight: true`  | `statusBarStyle: 'dark'`          |
-| `isStatusBarLight: false` | `statusBarStyle: 'light'`         |
+1. **Always enable edge-to-edge** for the best experience
+2. **Use `statusBarStyle: 'light'`** when your status bar background is **dark**
+3. **Use `statusBarStyle: 'dark'`** when your status bar background is **light**
+4. **Set `contentBackgroundColor`** to your app's main background color
 
 ---
 
-## 🤝 Contributing
+## 🆘 Common Issues
 
-Contributions are welcome! Please open issues or pull requests if you want to suggest improvements or fixes.
+**Q: Colors not showing on iOS?**  
+A: Make sure `edgeToEdge: true` is set.
 
-### Development Commands
+**Q: Dark mode not detected?**  
+A: Add the `colorSchemeChanged` listener before the app loads.
 
-```bash
-npm run build    # Build the plugin
-npm run verify   # Verify Android and iOS builds
-npm run lint     # Run ESLint
-```
+**Q: Status bar icons invisible?**  
+A: Check your `statusBarStyle` - use 'light' for dark backgrounds, 'dark' for light backgrounds.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 📜 Code of Conduct
-
-This project follows the [Contributor Code of Conduct](CODE-OF-CONDUCT.md). By participating, you agree to abide by its terms.
-
----
-
-## ☕ Sponsoring
-
-If you find this project helpful, please consider supporting me on Buy Me a Coffee! Your support helps me continue developing open-source software.
-
-[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/default-orange.png)](https://buymeacoffee.com/alaa_abdallah1)
+MIT License - Use it freely in your projects!
 
 ---
 

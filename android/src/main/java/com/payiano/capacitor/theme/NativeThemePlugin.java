@@ -33,7 +33,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * - Landscape orientation support
  *
  * @author Payiano
- * @version 2.0.0
+ * @version 1.0.0
  */
 @CapacitorPlugin(name = "SystemUI")
 public class NativeThemePlugin extends Plugin {

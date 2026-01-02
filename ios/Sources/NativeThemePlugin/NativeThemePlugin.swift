@@ -13,7 +13,7 @@ import UIKit
  * - Landscape orientation support
  *
  * @author Payiano
- * @version 2.2.0
+ * @version 1.0.0
  */
 @objc(NativeThemePlugin)
 public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
