@@ -1,6 +1,6 @@
 {
   "name": "capacitor-theme-support",
-  "version": "0.0.20",
+  "version": "0.0.21",
   "description": "A lightweight Capacitor plugin for advanced native theme customization, including Edge-to-Edge support, Window Background, and granular System Bar control for Android and iOS.",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -11,7 +11,7 @@
     "android/build.gradle",
     "dist/",
     "ios/Sources",
-    "PayianoCapacitorTheme.podspec"
+    "CapacitorThemeSupport.podspec"
   ],
   "author": "Payiano",
   "license": "MIT",

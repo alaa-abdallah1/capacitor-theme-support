@@ -70,6 +70,12 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     private var rightOverlay: UIView? // For landscape right inset
     
     // ============================================
+    // Trait Collection Observer
+    // ============================================
+    
+    private var traitObserverView: TraitObserverView?
+    
+    // ============================================
     // LIFECYCLE METHODS
     // ============================================
     
@@ -79,13 +85,8 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         // Initialize color scheme
         currentColorScheme = getSystemColorScheme()
         
-        // Listen for trait changes (including dark mode)
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleTraitCollectionChange),
-            name: UIApplication.didBecomeActiveNotification,
-            object: nil
-        )
+        // Setup trait collection observer for dark mode changes
+        setupTraitObserver()
         
         // Listen for orientation changes to update overlays
         NotificationCenter.default.addObserver(
@@ -98,9 +99,26 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
     
     deinit {
         NotificationCenter.default.removeObserver(self)
+        traitObserverView?.removeFromSuperview()
     }
     
-    @objc private func handleTraitCollectionChange() {
+    private func setupTraitObserver() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self,
+                  let viewController = self.bridge?.viewController else { return }
+            
+            // Create and add the observer view
+            let observerView = TraitObserverView { [weak self] in
+                self?.checkColorSchemeChange()
+            }
+            observerView.frame = CGRect(x: 0, y: 0, width: 1, height: 1)
+            observerView.isHidden = true
+            viewController.view.addSubview(observerView)
+            self.traitObserverView = observerView
+        }
+    }
+    
+    private func checkColorSchemeChange() {
         let newColorScheme = getSystemColorScheme()
         if newColorScheme != currentColorScheme {
             currentColorScheme = newColorScheme
@@ -597,6 +615,34 @@ public class NativeThemePlugin: CAPPlugin, CAPBridgedPlugin {
         var data = JSObject()
         data["colorScheme"] = colorScheme
         notifyListeners(EVENT_COLOR_SCHEME_CHANGED, data: data)
+    }
+}
+
+// ============================================
+// TraitObserverView - Detects system theme changes
+// ============================================
+
+/**
+ * A hidden UIView that observes trait collection changes.
+ * This is the reliable way to detect dark mode changes in iOS.
+ */
+private class TraitObserverView: UIView {
+    private var onTraitChange: (() -> Void)?
+    
+    init(onTraitChange: @escaping () -> Void) {
+        self.onTraitChange = onTraitChange
+        super.init(frame: .zero)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+            onTraitChange?()
+        }
     }
 }
 
