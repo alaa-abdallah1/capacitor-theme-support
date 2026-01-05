@@ -17,10 +17,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/payiano/capacitor-theme.git"
+    "url": "git+https://github.com/alaa-abdallah1/capacitor-theme-support.git"
   },
   "bugs": {
-    "url": "https://github.com/payiano/capacitor-theme/issues"
+    "url": "https://github.com/alaa-abdallah1/capacitor-theme-support/issues"
   },
   "keywords": [
     "capacitor",
