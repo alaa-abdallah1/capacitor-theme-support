@@ -2,4 +2,4 @@
 /// <reference path="types/app.config.d.ts" />
 /// <reference path="schema/nuxt.schema.d.ts" />
 
-export {}
+export {};

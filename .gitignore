@@ -9,6 +9,10 @@ dist/
 
 .eslintcache
 
+# Nuxt
+.nuxt/
+.output/
+
 # dotenv environment variables file
 .env
 
